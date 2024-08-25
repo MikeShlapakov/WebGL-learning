@@ -10,43 +10,58 @@
                 width: 100vw;
                 height: 100vh;
             }
+            #overlay {
+                position: absolute;
+                left: 10px;
+                top: 10px;
+                background-color: rgba(40, 40, 40, 0.7);
+                color: white;
+                font-family: monospace;
+                padding: 1em;
+            }
         </style>
     </head>
     <body>
+        <div id="overlay">
+            <div id="fps">FPS: </div>
+        </div>
         <script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
-        <script id="vertex-shader-2d" type="notjs">
+        <script src="./myUtils.js"></script>
+        <script src="./matrixUtils.js"></script>
+        <script  id="vertex-shader-3d" type="x-shader/x-vertex">
  
-            attribute vec2 a_position;
- 
-            uniform vec2 u_resolution;
-           
+            attribute vec4 a_position;
+            attribute vec4 a_color;
+
+            uniform mat4 u_matrix;
+
+            varying vec4 v_color;
+
             void main() {
-              // convert the position from pixels to 0.0 to 1.0
-              vec2 zeroToOne = a_position / u_resolution;
-           
-              // convert from 0->1 to 0->2
-              vec2 zeroToTwo = zeroToOne * 2.0;
-           
-              // convert from 0->2 to -1->+1 (clip space)
-              vec2 clipSpace = zeroToTwo - 1.0;
-           
-              gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+            // Multiply the position by the matrix.
+            gl_Position = u_matrix * a_position;
+
+            // Pass the color to the fragment shader.
+            v_color = a_color;
             }
            
         </script>
            
-        <script id="fragment-shader-2d" type="notjs">
+        <script  id="fragment-shader-3d" type="x-shader/x-fragment">
            
             // fragment shaders don't have a default precision so we need
             // to pick one. mediump is a good default
             precision mediump float;
-            
-            uniform vec4 u_color;
+
+            // Passed in from the vertex shader.
+            varying vec4 v_color;
+
+            uniform vec4 u_colorMult;
             
             void main() {
                 // gl_FragColor is a special variable a fragment shader
                 // is responsible for setting
-                gl_FragColor = u_color;
+                gl_FragColor = v_color * u_colorMult;
             }
            
         </script>
