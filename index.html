@@ -25,47 +25,32 @@
         <div id="overlay">
             <div id="fps">FPS: </div>
         </div>
-        <script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
+        <canvas id="canvas"></canvas>
         <script src="./myUtils.js"></script>
         <script src="./matrixUtils.js"></script>
+
         <script  id="vertex-shader-3d" type="x-shader/x-vertex">
- 
-            attribute vec4 a_position;
-            attribute vec4 a_color;
-
-            uniform mat4 u_matrix;
-
-            varying vec4 v_color;
-
-            void main() {
-            // Multiply the position by the matrix.
-            gl_Position = u_matrix * a_position;
-
-            // Pass the color to the fragment shader.
-            v_color = a_color;
+            attribute vec3 position;
+            uniform mat4 Pmatrix;
+            uniform mat4 Vmatrix;
+            uniform mat4 Mmatrix;
+            attribute vec3 color;//the color of the point
+            varying vec3 vColor;
+            void main(void) { //pre-built function
+                gl_Position = Pmatrix*Vmatrix*Mmatrix*vec4(position, 1.);
+                vColor = color;
             }
-           
         </script>
            
         <script  id="fragment-shader-3d" type="x-shader/x-fragment">
-           
             // fragment shaders don't have a default precision so we need
             // to pick one. mediump is a good default
             precision mediump float;
-
-            // Passed in from the vertex shader.
-            varying vec4 v_color;
-
-            uniform vec4 u_colorMult;
-            
-            void main() {
-                // gl_FragColor is a special variable a fragment shader
-                // is responsible for setting
-                gl_FragColor = v_color * u_colorMult;
+            varying vec3 vColor;
+            void main(void) {
+                gl_FragColor = vec4(vColor, 1.);
             }
-           
         </script>
-        <canvas id="canvas"></canvas>
-        <script src="./index.js"></script>
-    </body>
+
+        <script src="./test.js"></script>
 </html>

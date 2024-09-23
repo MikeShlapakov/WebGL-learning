@@ -1,3 +1,10 @@
+function createBufferFromArray(arr, glArr=gl.ARRAY_BUFFER){
+    var buff = gl.createBuffer ();
+    gl.bindBuffer(glArr, buff);
+    gl.bufferData(glArr, arr, gl.STATIC_DRAW);
+    return buff
+ }
+ 
 function getRelativeMousePosition(event, target) {
     target = target || event.target;
 

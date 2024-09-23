@@ -341,7 +341,6 @@ function lookAt(cameraPosition, target, up, dst) {
      * @param {number} far far Z clipping plane
      * @param {Matrix4} [dst] optional matrix to store result
      * @return {Matrix4} dst or a new matrix if none provided
-     * @memberOf module:webgl-3d-math
      */
     function perspective(fieldOfViewInRadians, aspect, near, far, dst) {
       dst = dst || new Array(16).fill(0);
