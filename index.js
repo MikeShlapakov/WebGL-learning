@@ -13,7 +13,7 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 /*========== Defining and storing the geometry ==========*/
 
 let n = 16;
-let chunks = 1;
+let chunks = 4;
 
 // Function to get vertices and determine visible faces for a cube
 function get_cube_data(x, y, z, size = 1) {
@@ -207,7 +207,7 @@ gl.useProgram(shaderprogram);
 var mo_matrix = [ 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 ];
 
 function get_projection(fov, a, zMin, zMax) {
-   var ang = degToRad(fov) // Math.tan((fov*.5)*Math.PI/180); 
+   var ang = degToRad(fov)*.5 // Math.tan((fov*.5)*Math.PI/180); 
    return [
       0.5/ang, 0 , 0, 0,
       0, 0.5*a/ang, 0, 0,
@@ -263,7 +263,7 @@ var obj = {
     // rotationSpeed: 0.02, // Speed of rotation
     zMax: 250,
     zMin: 0.25,
-    color: [ 150, 220, 255 , 1] // RGB array
+    skyColor: [ 150, 220, 255 , 1] // RGB array
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -279,7 +279,7 @@ var FOV = gui.add(obj, 'FOV').min(10).max(120).step(5);
 gui.add(obj, 'speed').min(0.01).max(1).step(0.01);
 gui.add(obj, 'zMax').min(10).max(500).step(10); // Increment amount
 gui.add(obj, 'zMin').min(0.01).max(10).step(0.05); // Increment amount
-gui.addColor(obj, 'color'); // Increment amount
+gui.addColor(obj, 'skyColor'); // Increment amount
 
 var animate = function(time) {
     let renderTime = performance.now();
@@ -288,7 +288,7 @@ var animate = function(time) {
     gl.enable(gl.DEPTH_TEST);
     // gl.depthFunc(gl.LEQUAL);
         
-    gl.clearColor(obj.color[0]/255, obj.color[1]/255, obj.color[2]/255, obj.color[3]);
+    gl.clearColor(obj.skyColor[0]/255, obj.skyColor[1]/255, obj.skyColor[2]/255, obj.skyColor[3]);
     // gl.clearDepth(1.0);
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
