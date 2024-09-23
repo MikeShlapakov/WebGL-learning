@@ -12,96 +12,154 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 /*========== Defining and storing the geometry ==========*/
 
-var vertices = []
-var colors = []
-var indices = []
-function get_ver(x, y, z, size = 1) {
-   // Vertices for a single cube, relative to (x, y, z)
-   const half = size / 2;
-   return [
-      // back
-      x - half, y - half, z - half,  // 1: bottom-right
-      x + half, y - half, z - half,  // 0: bottom-left
-      x + half, y + half, z - half,  // 2: top-left
-      x - half, y + half, z - half,  // 3: top-right
-      
-      // front
-      x + half, y - half, z + half,  // 5: bottom-right
-      x - half, y - half, z + half,  // 4: bottom-left
-      x - half, y + half, z + half,  // 7: top-left
-      x + half, y + half, z + half,  // 6: top-right
-
-      // left
-      x - half, y - half, z + half,  // 11: bottom-right
-      x - half, y - half, z - half,  // 8: bottom-left
-      x - half, y + half, z - half,  // 9: top-left
-      x - half, y + half, z + half,  // 10: top-right
-
-      // right
-      x + half, y - half, z - half,  // 12: bottom-right
-      x + half, y - half, z + half,  // 14: bottom-left
-      x + half, y + half, z + half,  // 14: top-left
-      x + half, y + half, z - half,  // 13: top-right
-
-      // bottom
-      x + half, y - half, z - half,  // 19: bottom-right
-      x - half, y - half, z - half,  // 16: bottom-left
-      x - half, y - half, z + half,  // 17: top-left
-      x + half, y - half, z + half,  // 18: top-right
-
-      // top
-      x + half, y + half, z + half,  // 22: bottom-right
-      x - half, y + half, z + half,  // 21: bottom-left
-      x - half, y + half, z - half,  // 20: top-left
-      x + half, y + half, z - half,  // 23: top-right
-   ];
-}
-
-var col = [
-   1,0,0, 0,1,0, 0,0,1, 1,1,0, // back
-   1,0,0, 0,1,0, 0,0,1, 1,1,0, // front
-   1,0,0, 0,1,0, 0,0,1, 1,1,0, // right
-   1,0,0, 0,1,0, 0,0,1, 1,1,0, // left
-   1,0,0, 0,1,0, 0,0,1, 1,1,0, // bottom
-   1,0,0, 0,1,0, 0,0,1, 1,1,0  // top
-];
-
-// console.log(colors)
-
-function get_indices(k){ 
-   return [
-      0+k, 2+k, 1+k, 0+k, 3+k, 2+k, // Back face
-      4+k, 6+k, 5+k, 4+k, 7+k, 6+k, // Front face
-      8+k, 10+k, 9+k, 8+k, 11+k,10+k, // Left face
-      12+k,14+k, 13+k, 12+k, 15+k, 14+k,// Right face
-      16+k,18+k, 17+k, 16+k, 19+k, 18+k,// Bottom face
-      20+k,22+k, 21+k, 20+k, 23+k,  22+k // Top face
-   ];
-}
-
 let n = 16;
-let chunks = 1
+let chunks = 4;
+
+// Function to get vertices and determine visible faces for a cube
+function get_cube_data(x, y, z, size = 1) {
+    const half = size / 2;
+    let vertices = [];
+    let colors = [];
+    let indices = [];
+    let visibleFaces = [];
+
+    // Check each face
+    if (y === 0 || !visibilityGrid[x][y-1][z]) {
+        visibleFaces.push('bottom');
+    }
+    if (y === n - 1 || !visibilityGrid[x][y+1][z]) {
+        visibleFaces.push('top');
+    }
+    if (x === 0 || !visibilityGrid[x-1][y][z]) {
+        visibleFaces.push('left');
+    }
+    if (x === n * chunks - 1 || !visibilityGrid[x+1][y][z]) {
+        visibleFaces.push('right');
+    }
+    if (z === 0 || !visibilityGrid[x][y][z-1]) {
+        visibleFaces.push('back');
+    }
+    if (z === n * chunks - 1 || !visibilityGrid[x][y][z+1]) {
+        visibleFaces.push('front');
+    }
+
+    let vertexCount = 0;
+    visibleFaces.forEach(face => {
+        switch(face) {
+            case 'back':
+                vertices.push(
+                    x - half, y - half, z - half,
+                    x + half, y - half, z - half,
+                    x + half, y + half, z - half,
+                    x - half, y + half, z - half
+                );
+                break;
+            case 'front':
+                vertices.push(
+                    x + half, y - half, z + half,
+                    x - half, y - half, z + half,
+                    x - half, y + half, z + half,
+                    x + half, y + half, z + half
+                );
+                break;
+            case 'left':
+                vertices.push(
+                    x - half, y - half, z + half,
+                    x - half, y - half, z - half,
+                    x - half, y + half, z - half,
+                    x - half, y + half, z + half
+                );
+                break;
+            case 'right':
+                vertices.push(
+                    x + half, y - half, z - half,
+                    x + half, y - half, z + half,
+                    x + half, y + half, z + half,
+                    x + half, y + half, z - half
+                );
+                break;
+            case 'bottom':
+                vertices.push(
+                    x + half, y - half, z - half,
+                    x - half, y - half, z - half,
+                    x - half, y - half, z + half,
+                    x + half, y - half, z + half
+                );
+                break;
+            case 'top':
+                vertices.push(
+                    x + half, y + half, z + half,
+                    x - half, y + half, z + half,
+                    x - half, y + half, z - half,
+                    x + half, y + half, z - half
+                );
+                break;
+        }
+         colors = colors.concat([1,0,0, 0,1,0, 0,0,1, 1,1,0]);
+        //colors = colors.concat([x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks)]);
+        indices = indices.concat([
+            vertexCount, vertexCount + 2, vertexCount + 1,
+            vertexCount, vertexCount + 3, vertexCount + 2
+        ]);
+        vertexCount += 4;
+    });
+
+    return { vertices, colors, indices };
+}
+
+// 3D array to store cube visibility
+let visibilityGrid = new Array(n * chunks).fill(null).map(() => 
+    new Array(n).fill(null).map(() => 
+        new Array(n * chunks).fill(true)
+    )
+);
+
+// Function to check if a cube is visible (not fully occluded)
+function isCubeVisible(x, y, z) {
+    // Check if it's on the edge of the grid
+    if (x === 0 || x === n*chunks - 1 || y === 0 || y === n - 1 || z === 0 || z === n*chunks - 1) {
+        return true;
+    }
+    // console.log(x,y,z, visibilityGrid)
+    // Check if any neighboring cube is missing
+    return !visibilityGrid[x-1][y][z] || !visibilityGrid[x+1][y][z] ||
+           !visibilityGrid[x][y-1][z] || !visibilityGrid[x][y+1][z] ||
+           !visibilityGrid[x][y][z-1] || !visibilityGrid[x][y][z+1];
+}
+
+let vertices = [];
+let colors = [];
+let indices = [];
 let k = 0;
-for(let w = 1; w <= chunks; w++){
-   console.log(w/chunks * 100)
-   for(let l = 1; l <= chunks; l++){
+
+for(let w = 0; w < chunks; w++){
+   for(let l = 0; l < chunks; l++){
+     console.log((w/chunks+l/(chunks*chunks)) * 100)
       for(let i = 0; i < n; i++){
          for(let j = 0; j < n; j++){
             for(let z = 0; z < n; z++){
-               // console.log((i*n+j)*n+z, i, j, z)
-               // console.log(1 < i && i < n )
-               // if (0 < i && i < n-1 && 0 < j && j < n-1 && 0 < z && z < n-1) continue;
-               vertices = vertices.concat(get_ver((w*n)+i,z,(l*n)+j))
-               colors = colors.concat(col)
-               indices = indices.concat(get_indices(k*24))
-               k++;
+                let x = w * n + i;
+                let y = z;
+                let zCoord = l * n + j;
+                
+                if (isCubeVisible(x, y, zCoord)) {
+                    // console.log(x,y,zCoord)
+                    let cubeData = get_cube_data(x, y, zCoord, 1);
+                    vertices = vertices.concat(cubeData.vertices);
+                    colors = colors.concat(cubeData.colors);
+                    indices = indices.concat(cubeData.indices.map(index => index + k));
+                    k += cubeData.vertices.length / 3;
+                } else {
+                    // visibilityGrid[x][y][zCoord] = false;
+                }
             }
          }
       }
    }
 }
 
-console.log(indices.length)
+console.log("Number of vertices:", vertices.length);
+console.log("Number of indices:", indices.length);
 
 // Create and store data into vertex buffer
 var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
@@ -202,7 +260,7 @@ FPSElement.appendChild(FPSNode);
 
 let FOV = 60;
 
-const cameraPos = {x: 0, y: 2, z: 0}
+let cameraPosition = {x: 0, y: 1, z: 1}
 
 const speed = 0.25;
 const rotationSpeed = 0.02; // Speed of rotation
@@ -219,15 +277,15 @@ var animate = function(time) {
    gl.viewport(0.0, 0.0, canvas.width, canvas.height);
    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-   var proj_matrix = get_projection(FOV, canvas.width/canvas.height, 1, 100);
-   let cameraPosition = calculateCameraPos(cameraPos, speed, yaw, pitch);
-   var target = [ cameraPosition[0] + Math.cos(pitch) * Math.sin(yaw),
-                  cameraPosition[1] - Math.sin(pitch),
-                  cameraPosition[2] - Math.cos(pitch) * Math.cos(yaw)
-               ];
+   var proj_matrix = get_projection(FOV, canvas.width/canvas.height, 0.25, 100);
+   var cameraPositionArray = calculateCameraPos(cameraPosition, speed, yaw, pitch);
+   var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.sin(yaw),
+                    cameraPositionArray[1] - Math.sin(pitch),
+                    cameraPositionArray[2] - Math.cos(pitch) * Math.cos(yaw)
+                ];
 
    var up = [0, 1, 0];
-   var cameraMatrix = lookAt(cameraPosition, target, up);
+   var cameraMatrix = lookAt(cameraPositionArray, target, up);
 
    // Make a view matrix from the camera matrix.
    var view_matrix = inverse(cameraMatrix);
