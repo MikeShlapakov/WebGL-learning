@@ -66,7 +66,7 @@ function calculateCameraPos(cameraPos, speed, yaw, pitch){
     if (keys[' ']) // Move up
         normal = addVector(normal, normalizeVector([0,1,0]));
             
-    if (keys['Control']) // Move down
+    if (keys['Shift']) // Move down
         normal = addVector(normal, normalizeVector([0,-1,0]));
     
     if (normal != [0,0,0]){
@@ -81,20 +81,20 @@ function calculateCameraPos(cameraPos, speed, yaw, pitch){
 
 // Keydown event listener
 document.addEventListener('keydown', function(event) {
-
+    // console.log(event.key)
     switch(event.key) {
-        case 'ArrowLeft': // Rotate left (yaw negative)
-            yaw -= rotationSpeed;
-            break;
-        case 'ArrowRight': // Rotate right (yaw positive)
-            yaw += rotationSpeed;
-            break;
-        case 'ArrowUp': // Rotate up (pitch positive)
-            pitch -= rotationSpeed;
-            break;
-        case 'ArrowDown': // Rotate down (pitch negative)
-            pitch += rotationSpeed;
-            break;
+        // case 'ArrowLeft': // Rotate left (yaw negative)
+        //     yaw -= rotationSpeed;
+        //     break;
+        // case 'ArrowRight': // Rotate right (yaw positive)
+        //     yaw += rotationSpeed;
+        //     break;
+        // case 'ArrowUp': // Rotate up (pitch positive)
+        //     pitch -= rotationSpeed;
+        //     break;
+        // case 'ArrowDown': // Rotate down (pitch negative)
+        //     pitch += rotationSpeed;
+        //     break;
 
         case 'a':
         case 'A': 
@@ -115,8 +115,8 @@ document.addEventListener('keydown', function(event) {
         case ' ':
             keys[' '] = true;
             break;
-        case 'Control': // Shift key - Move down
-            keys['Control'] = true;
+        case 'Shift': // Shift key - Move down
+            keys['Shift'] = true;
             break;
         default:
             break;
@@ -145,148 +145,10 @@ document.addEventListener('keyup', function(event) {
         case ' ':
             keys[' '] = false;
             break;
-        case 'Control': 
-            keys['Control'] = false;
+        case 'Shift': 
+            keys['Shift'] = false;
             break;
         default:
             break;
         }
 })
-
-function allButIndices(name) {
-    return name !== 'indices';
-}
-
-function deindexVertices(vertices) {
-    const indices = vertices.indices;
-    const newVertices = {};
-    const numElements = indices.length;
-
-    function expandToUnindexed(channel) {
-        const srcBuffer = vertices[channel];
-        const numComponents = srcBuffer.numComponents;
-        const dstBuffer = webglUtils.createAugmentedTypedArray(numComponents, numElements, srcBuffer.constructor);
-        for (let ii = 0; ii < numElements; ++ii) {
-        const ndx = indices[ii];
-        const offset = ndx * numComponents;
-        for (let jj = 0; jj < numComponents; ++jj) {
-            dstBuffer.push(srcBuffer[offset + jj]);
-        }
-        }
-        newVertices[channel] = dstBuffer;
-    }
-
-    Object.keys(vertices).filter(allButIndices).forEach(expandToUnindexed);
-
-    return newVertices;
-}
-
-function createFlattenedFunc(vertFunc, color) {
-    const vertices = vertFunc;
-    const { indices, ...attributes } = vertices;
-    const numElements = indices.length;
-    
-    const newVertices = Object.fromEntries(
-        Object.entries(attributes).map(([name, attr]) => {
-            const newAttr = new attr.constructor(numElements * attr.numComponents);
-            for (let i = 0; i < numElements; i++) {
-                const index = indices[i] * attr.numComponents;
-                for (let j = 0; j < attr.numComponents; j++) {
-                    newAttr[i * attr.numComponents + j] = attr[index + j];
-                }
-            }
-            return [name, newAttr];
-        })
-    );
-
-    // Add random colors
-    newVertices.color = new Uint8Array(numElements * 4);
-    for (let i = 0; i < numElements; i += 6) {
-        // const color = [Math.random() * 128,Math.random() * 128,Math.random() * 128,255].map(Math.floor);
-        newVertices.color.set(color.concat(color, color, color, color, color), i * 4);
-    }
-
-    return webglUtils.createBufferInfoFromArrays(gl, newVertices);
-};
-
-
-const CUBE_FACE_INDICES = [
-    [3, 7, 5, 1], // right
-    [6, 2, 0, 4], // left
-    [6, 7, 3, 2], // ??
-    [0, 1, 5, 4], // ??
-    [7, 6, 4, 5], // front
-    [2, 3, 1, 0], // back
-];
-
-
-/**
- * Creates the vertices and indices for a cube. The
- * cube will be created around the origin. (-size / 2, size / 2)
- *
- * @param {number} size Width, height and depth of the cube.
- * @return {Object.<string, TypedArray>} The
- *         created plane vertices.
- */
-function createCubeVertices(size) {
-    const k = size / 2;
-
-    const cornerVertices = [
-      [-k, -k, -k],
-      [+k, -k, -k],
-      [-k, +k, -k],
-      [+k, +k, -k],
-      [-k, -k, +k],
-      [+k, -k, +k],
-      [-k, +k, +k],
-      [+k, +k, +k],
-    ];
-
-    const faceNormals = [
-      [+1, +0, +0],
-      [-1, +0, +0],
-      [+0, +1, +0],
-      [+0, -1, +0],
-      [+0, +0, +1],
-      [+0, +0, -1],
-    ];
-
-    const uvCoords = [
-      [1, 0],
-      [0, 0],
-      [0, 1],
-      [1, 1],
-    ];
-
-    const numVertices = 6 * 4;
-    const positions = webglUtils.createAugmentedTypedArray(3, numVertices);
-    const normals   = webglUtils.createAugmentedTypedArray(3, numVertices);
-    const texCoords = webglUtils.createAugmentedTypedArray(2 , numVertices);
-    const indices   = webglUtils.createAugmentedTypedArray(3, 6 * 2, Uint16Array);
-
-    for (let f = 0; f < 6; ++f) {
-      const faceIndices = CUBE_FACE_INDICES[f];
-      for (let v = 0; v < 4; ++v) {
-        const position = cornerVertices[faceIndices[v]];
-        const normal = faceNormals[f];
-        const uv = uvCoords[v];
-
-        // Each face needs all four vertices because the normals and texture
-        // coordinates are not all the same.
-        positions.push(position);
-        normals.push(normal);
-        texCoords.push(uv);
-      }
-      // Two triangles make a square face.
-      const offset = 4 * f;
-      indices.push(offset + 0, offset + 1, offset + 2);
-      indices.push(offset + 0, offset + 2, offset + 3);
-    }
-
-    return {
-      position: positions,
-      normal: normals,
-      texcoord: texCoords,
-      indices: indices,
-    };
-}

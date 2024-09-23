@@ -13,7 +13,7 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 /*========== Defining and storing the geometry ==========*/
 
 let n = 16;
-let chunks = 4;
+let chunks = 1;
 
 // Function to get vertices and determine visible faces for a cube
 function get_cube_data(x, y, z, size = 1) {
@@ -95,7 +95,7 @@ function get_cube_data(x, y, z, size = 1) {
                 );
                 break;
         }
-         colors = colors.concat([1,0,0, 0,1,0, 0,0,1, 1,1,0]);
+        colors = colors.concat([1,0,0, 0,1,0, 0,0,1, 0,1,1]);
         //colors = colors.concat([x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks)]);
         indices = indices.concat([
             vertexCount, vertexCount + 2, vertexCount + 1,
@@ -207,7 +207,7 @@ gl.useProgram(shaderprogram);
 var mo_matrix = [ 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 ];
 
 function get_projection(fov, a, zMin, zMax) {
-   var ang = degToRad(fov) //Math.tan((angle*.5)*Math.PI/180);
+   var ang = degToRad(fov) // Math.tan((fov*.5)*Math.PI/180); 
    return [
       0.5/ang, 0 , 0, 0,
       0, 0.5*a/ang, 0, 0,
@@ -238,9 +238,10 @@ document.addEventListener('mousemove', e => {
 
 document.addEventListener("wheel", e => {
    // scale the FOV by 5 units
-   FOV += e.deltaY * 0.05; 
+   obj.FOV += e.deltaY * 0.05; 
    // Restrict scale
-   FOV = Math.min(Math.max(10, FOV), 120);
+   obj.FOV = Math.min(Math.max(10, obj.FOV), 120);
+   FOV.updateDisplay()
 }, { passive: false });
 
 
@@ -252,62 +253,77 @@ document.addEventListener("mouseout", e => {document.exitPointerLock();});
 /*=================== Drawing =================== */
 
 let frameCount = 0;
-let renderSum = 0; // Update FPS every second
+let renderSum = 0; // sum of render time for each frame
 
-var FPSElement = document.querySelector("#fps");
-var FPSNode = document.createTextNode("");
-FPSElement.appendChild(FPSNode);
+var obj = {
+    FPS: 0,
+    cameraPosition: {x: 0, y:1, z:1},
+    FOV: 60,
+    speed: 0.25,
+    // rotationSpeed: 0.02, // Speed of rotation
+    zMax: 250,
+    zMin: 0.25,
+    color: [ 150, 220, 255 , 1] // RGB array
+};
 
-let FOV = 60;
+var gui = new dat.gui.GUI({ autoPlace: true });
+gui.domElement.id = 'gui';
 
-let cameraPosition = {x: 0, y: 1, z: 1}
-
-const speed = 0.25;
-const rotationSpeed = 0.02; // Speed of rotation
+var FPS = gui.add(obj, 'FPS')
+var cameraPositionFolder = gui.addFolder('Camera Position')
+cameraPositionFolder.add(obj.cameraPosition, 'x')
+cameraPositionFolder.add(obj.cameraPosition, 'y')  
+cameraPositionFolder.add(obj.cameraPosition, 'z')
+cameraPositionFolder.open()
+var FOV = gui.add(obj, 'FOV').min(10).max(120).step(5);
+gui.add(obj, 'speed').min(0.01).max(1).step(0.01);
+gui.add(obj, 'zMax').min(10).max(500).step(10); // Increment amount
+gui.add(obj, 'zMin').min(0.01).max(10).step(0.05); // Increment amount
+gui.addColor(obj, 'color'); // Increment amount
 
 var animate = function(time) {
-   let renderTime = performance.now();
+    let renderTime = performance.now();
 
-   gl.enable(gl.CULL_FACE);
-   gl.enable(gl.DEPTH_TEST);
-   // gl.depthFunc(gl.LEQUAL);
+    gl.enable(gl.CULL_FACE);
+    gl.enable(gl.DEPTH_TEST);
+    // gl.depthFunc(gl.LEQUAL);
+        
+    gl.clearColor(obj.color[0]/255, obj.color[1]/255, obj.color[2]/255, obj.color[3]);
+    // gl.clearDepth(1.0);
+    gl.viewport(0.0, 0.0, canvas.width, canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-   gl.clearColor(0.7, 0.9, 1.0, 1);
-   // gl.clearDepth(1.0);
-   gl.viewport(0.0, 0.0, canvas.width, canvas.height);
-   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
+    var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, yaw, pitch);
+    cameraPositionFolder.updateDisplay()
+    var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.sin(yaw),
+                        cameraPositionArray[1] - Math.sin(pitch),
+                        cameraPositionArray[2] - Math.cos(pitch) * Math.cos(yaw)
+                    ];
 
-   var proj_matrix = get_projection(FOV, canvas.width/canvas.height, 0.25, 100);
-   var cameraPositionArray = calculateCameraPos(cameraPosition, speed, yaw, pitch);
-   var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.sin(yaw),
-                    cameraPositionArray[1] - Math.sin(pitch),
-                    cameraPositionArray[2] - Math.cos(pitch) * Math.cos(yaw)
-                ];
+    var up = [0, 1, 0];
+    var cameraMatrix = lookAt(cameraPositionArray, target, up);
 
-   var up = [0, 1, 0];
-   var cameraMatrix = lookAt(cameraPositionArray, target, up);
+    // Make a view matrix from the camera matrix.
+    var view_matrix = inverse(cameraMatrix);
 
-   // Make a view matrix from the camera matrix.
-   var view_matrix = inverse(cameraMatrix);
+    gl.uniformMatrix4fv(_Pmatrix, false, proj_matrix);
+    gl.uniformMatrix4fv(_Vmatrix, false, view_matrix);
+    gl.uniformMatrix4fv(_Mmatrix, false, mo_matrix);
 
-   gl.uniformMatrix4fv(_Pmatrix, false, proj_matrix);
-   gl.uniformMatrix4fv(_Vmatrix, false, view_matrix);
-   gl.uniformMatrix4fv(_Mmatrix, false, mo_matrix);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
 
-   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-   gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
-   
-   renderTime = performance.now() - renderTime
-   renderSum += renderTime
-   frameCount++;
+    renderSum += performance.now() - renderTime
+    frameCount++;
 
-   // Update FPS every second
-   if (frameCount >= 100) {
-       FPSNode.nodeValue = Math.round((frameCount * 1000) / (renderSum));
-       frameCount = 0;
-       renderSum = 0;
-   }
+    // Update FPS every second
+    if (frameCount >= 100) {
+        FPS.setValue(Math.round((frameCount * 1000) / (renderSum)));
+        frameCount = 0;
+        renderSum = 0;
+    }
 
-   window.requestAnimationFrame(animate);
+    window.requestAnimationFrame(animate);
 }
 animate(0);
