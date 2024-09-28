@@ -136,6 +136,7 @@ for(let w = 0; w < chunks; w++){
    for(let l = 0; l < chunks; l++){
      console.log((w/chunks+l/(chunks*chunks)) * 100)
       for(let i = 0; i < n; i++){
+        console.log((w/chunks+l/(chunks*chunks) + (i/n)) * 100)
          for(let j = 0; j < n; j++){
             for(let z = 0; z < n; z++){
                 let x = w * n + i;

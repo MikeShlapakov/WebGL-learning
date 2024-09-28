@@ -98,14 +98,18 @@ function cross(a, b, dst) {
 }
   
 /**
- * Computes the dot product of two vectors; assumes both vectors have
- * three entries.
- * @param {Vector3} a Operand vector.
- * @param {Vector3} b Operand vector.
+ * Computes the dot product of two vectors (respectively to the shorter vector).
+ * @param {Vector} a Operand vector.
+ * @param {Vector} b Operand vector.
  * @return {number} dot product
  */
 function dot(a, b) {
-    return (a[0] * b[0]) + (a[1] * b[1]) + (a[2] * b[2]);
+  let len = a.length < b.length ? a.length : b.length;
+  let sum = 0;
+  for(let i = 0; i < len; i++){
+    sum += a[i] * b[i];
+  }
+  return sum;
 }
   
 /**
