@@ -12,6 +12,7 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 /*========== Defining and storing the geometry ==========*/
 
+let height = 2
 let n = 16;
 let chunks = 4;
 
@@ -27,7 +28,7 @@ function get_cube_data(x, y, z, size = 1) {
     if (y === 0 || !visibilityGrid[x][y-1][z]) {
         visibleFaces.push('bottom');
     }
-    if (y === n - 1 || !visibilityGrid[x][y+1][z]) {
+    if (y === height - 1 || !visibilityGrid[x][y+1][z]) {
         visibleFaces.push('top');
     }
     if (x === 0 || !visibilityGrid[x-1][y][z]) {
@@ -109,7 +110,7 @@ function get_cube_data(x, y, z, size = 1) {
 
 // 3D array to store cube visibility
 let visibilityGrid = new Array(n * chunks).fill(null).map(() => 
-    new Array(n).fill(null).map(() => 
+    new Array(height).fill(null).map(() => 
         new Array(n * chunks).fill(true)
     )
 );
@@ -117,7 +118,7 @@ let visibilityGrid = new Array(n * chunks).fill(null).map(() =>
 // Function to check if a cube is visible (not fully occluded)
 function isCubeVisible(x, y, z) {
     // Check if it's on the edge of the grid
-    if (x === 0 || x === n*chunks - 1 || y === 0 || y === n - 1 || z === 0 || z === n*chunks - 1) {
+    if (x === 0 || x === n*chunks - 1 || y === 0 || y === height - 1 || z === 0 || z === n*chunks - 1) {
         return true;
     }
     // console.log(x,y,z, visibilityGrid)
@@ -133,29 +134,25 @@ let indices = [];
 let k = 0;
 
 for(let w = 0; w < chunks; w++){
-   for(let l = 0; l < chunks; l++){
-     console.log((w/chunks+l/(chunks*chunks)) * 100)
-      for(let i = 0; i < n; i++){
-         for(let j = 0; j < n; j++){
-            for(let z = 0; z < n; z++){
-                let x = w * n + i;
-                let y = z;
-                let zCoord = l * n + j;
-                
-                if (isCubeVisible(x, y, zCoord)) {
-                    // console.log(x,y,zCoord)
-                    let cubeData = get_cube_data(x, y, zCoord, 1);
-                    vertices = vertices.concat(cubeData.vertices);
-                    colors = colors.concat(cubeData.colors);
-                    indices = indices.concat(cubeData.indices.map(index => index + k));
-                    k += cubeData.vertices.length / 3;
-                } else {
-                    // visibilityGrid[x][y][zCoord] = false;
+    for(let l = 0; l < chunks; l++){
+        for(let x = 0; x < n; x++){
+            // console.log(((l+w*chunks)*n + x)/(chunks*chunks*n) * 100)
+            for(let y = 0; y < height; y++){
+                for(let z = 0; z < n; z++){
+                    if (isCubeVisible(w * n + x, y, l * n + z)) {
+                        // console.log(x,y,zCoord)
+                        let cubeData = get_cube_data(w * n + x, y, l * n + z, 1);
+                        vertices = vertices.concat(cubeData.vertices);
+                        colors = colors.concat(cubeData.colors);
+                        indices = indices.concat(cubeData.indices.map(index => index + k));
+                        k += cubeData.vertices.length / 3;
+                    } else {
+                        // visibilityGrid[w * n + x][y][l * n + z] = false;
+                    }
                 }
             }
-         }
-      }
-   }
+        }
+    }
 }
 
 console.log("Number of vertices:", vertices.length);
@@ -255,6 +252,7 @@ document.addEventListener("mouseout", e => {document.exitPointerLock();});
 let frameCount = 0;
 let renderSum = 0; // sum of render time for each frame
 
+var precentage = {precent: 0}
 var obj = {
     FPS: 0,
     cameraPosition: {x: 0, y:1, z:1},
@@ -269,6 +267,7 @@ var obj = {
 var gui = new dat.gui.GUI({ autoPlace: true });
 gui.domElement.id = 'gui';
 
+// var perc = gui.add(precentage, 'precent')
 var FPS = gui.add(obj, 'FPS')
 var cameraPositionFolder = gui.addFolder('Camera Position')
 cameraPositionFolder.add(obj.cameraPosition, 'x')
