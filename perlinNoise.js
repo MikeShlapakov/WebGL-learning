@@ -1,56 +1,5 @@
-class Color {
-    constructor(r=0, g=0, b=0) {
-        this.r = this._clamp(r);
-        this.g = this._clamp(g);
-        this.b = this._clamp(b);
-    }
-
-    _clamp(value) {
-        return Math.max(0, Math.min(255, value));
-    }
-
-    toRgbString() {
-        return `rgb(${this.r}, ${this.g}, ${this.b})`;
-    }
-
-    toHexString() {
-        return `#${this.r.toString(16).padStart(2, '0')}${this.g.toString(16).padStart(2, '0')}${this.b.toString(16).padStart(2, '0')}`;
-    }
-
-    toString() {
-        return this.toRgbString();
-    }
-}
-
-function pseudoRnd(x){
-    let f = Math.cos(Math.sin(x) * 1000)
-    return f ;
-}
-
-function pseudoRndVec(vec2){
-    vec2 = [vec2[0] + 1, vec2[1] + 1];
-    let x = dot(vec2, [123.4, 234.5]);
-    let y = dot(vec2, [345.6, 456.7]);
-
-    let grad = [Math.sin(x), Math.sin(y)];
-    grad = [grad[0] * 1234.4321, grad[1] * 5678.8765];
-    grad = [Math.cos(grad[0]),Math.sin(grad[1])];
-
-    return grad;
-}
-
 function lerp(a, b, t){
     return a + t * (b - a);
-}
-
-function coserp(a, b, t){
-    let l = (1 - Math.cos(t * Math.PI)) / 2;
-    return lerp(a, b, l);
-}
-
-function rotateVector(vec, deg){
-    return [ Math.cos(deg)*vec[0] - Math.sin(deg)*vec[1],
-             Math.sin(deg)*vec[0] + Math.cos(deg)*vec[1] ]
 }
 
 function quinticFade(x, min=0, max=1){
@@ -59,12 +8,76 @@ function quinticFade(x, min=0, max=1){
 }
 
 function cubicFade( x, min=0, max=1) {
-    // x = clamp((x - edge0) / (edge1 - edge0));
+    // x = clamp((x - min) / (max - min));
     return x * x * (3 - 2 * x);
- }
- 
-function clamp(x, lowerlimit = 0, upperlimit = 1) {
-    return Math.max(lowerlimit, Math.min(upperlimit, x));
+}
+
+function clamp(value) {
+    return Math.max(0, Math.min(255, value));
+}
+
+function noise(x, y, z){
+    let xi = x & 255;                              // Calculate the "unit cube" that the point asked will be located in
+    let yi = y & 255;                              // The left bound is ( |_x_|,|_y_|,|_z_| ) and the right bound is that
+    let zi = z & 255;                              // plus 1.  Next we calculate the location (from 0.0 to 1.0) in that cube.
+    let xf = x - Math.floor(x);
+    let yf = y - Math.floor(y);
+    let zf = z - Math.floor(z);
+
+    let u = quinticFade(xf)
+    let v = quinticFade(yf)
+    let w = quinticFade(zf)
+
+    let aaa = p[p[p[ xi ]+  yi ]+  zi ];
+    let aba = p[p[p[ xi ]+ yi+1]+  zi ];
+    let aab = p[p[p[ xi ]+  yi ]+ zi+1];
+    let abb = p[p[p[ xi ]+ yi+1]+ zi+1];
+    let baa = p[p[p[xi+1]+  yi ]+  zi ];
+    let bba = p[p[p[xi+1]+ yi+1]+  zi ];
+    let bab = p[p[p[xi+1]+  yi ]+ zi+1];
+    let bbb = p[p[p[xi+1]+ yi+1]+ zi+1];
+
+    let x1 = lerp(  grad (aaa, xf  , yf  , zf),            // The gradient function calculates the dot product between a pseudorandom
+                    grad (baa, xf-1, yf  , zf),            // gradient vector and the vector from the input coordinate to the 8
+                    u);                                    // surrounding points in its unit cube.
+    let x2 = lerp(  grad (aba, xf  , yf-1, zf),            // This is all then lerped together as a sort of weighted average based on the faded (u,v,w)
+                    grad (bba, xf-1, yf-1, zf),            // values we made earlier.
+                    u);
+    let y1 = lerp(x1, x2, v);
+
+    x1 = lerp(  grad (aab, xf  , yf  , zf-1),
+                grad (bab, xf-1, yf  , zf-1),
+                u);
+    x2 = lerp( grad (abb, xf  , yf-1, zf-1),
+                grad (bbb, xf-1, yf-1, zf-1),
+                u);
+    let y2 = lerp (x1, x2, v);
+    
+    return (lerp (y1, y2, w)+1)/2;    
+}
+
+function grad(hash, x, y, z)
+{
+    switch(hash & 0xF)
+    {
+        case 0x0: return  x + y;
+        case 0x1: return -x + y;
+        case 0x2: return  x - y;
+        case 0x3: return -x - y;
+        case 0x4: return  x + z;
+        case 0x5: return -x + z;
+        case 0x6: return  x - z;
+        case 0x7: return -x - z;
+        case 0x8: return  y + z;
+        case 0x9: return -y + z;
+        case 0xA: return  y - z;
+        case 0xB: return -y - z;
+        case 0xC: return  y + x;
+        case 0xD: return -y + z;
+        case 0xE: return  y - x;
+        case 0xF: return -y - z;
+        default: return 0; // never happens
+    }
 }
 
 // Create a canvas element
@@ -74,104 +87,66 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth * window.devicePixelRatio   || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-const noiseSize = 8 // noise size
-const cellsize = 2**noiseSize  
-const resolution = 2  //resolution
-const cellLength = cellsize/resolution; // ratio of the pixels
-const gridLength = 2**(9-noiseSize)  // grid size 
-const brightness = 0.9
+const noiseSize = 4   // noise size
+const resolution = 2**noiseSize/Math.max(canvas.width, canvas.height)
 
-let perlin = new Array(gridLength).fill(new Array(gridLength).fill(new Array(cellLength).fill(new Array(cellLength).fill(null))));
+let perlin = new Array(canvas.height*canvas.width).fill(0);
 
-function cellEvaluation(x, y, vecArray){
-    for (let i = 0; i < cellLength; i++) {
-        for (let j = 0; j < cellLength; j++){
-            let center = [(j)*resolution+resolution/2, (i)*resolution+resolution/2] // center of each pixel
-            // console.log(center)
-            // distance of the pixel from the corners of the cell
-            let distTl = [center[0]/cellsize-0, center[1]/cellsize-0];
-            let distTr = [center[0]/cellsize-1, center[1]/cellsize-0];
-            let distBl = [center[0]/cellsize-0, center[1]/cellsize-1];
-            let distBr = [center[0]/cellsize-1, center[1]/cellsize-1];
+let p = new Array(512);
 
-            // calculating the dot for each pixel
-            let dotTl = dot(vecArray.tl, distTl) // vecArray[0][0]*(center[0]/cellsize-0)+vecArray[0][1]*(0-center[1]/cellsize);
-            let dotTr = dot(vecArray.tr, distTr) // vecArray[1][0]*(center[0]/cellsize-1)+vecArray[1][1]*(0-center[1]/cellsize);
-            let dotBl = dot(vecArray.bl, distBl) // vecArray[2][0]*(center[0]/cellsize-0)+vecArray[2][1]*(1-center[1]/cellsize);
-            let dotBr = dot(vecArray.br, distBr) // vecArray[3][0]*(center[0]/cellsize-1)+vecArray[3][1]*(1-center[1]/cellsize);
-            
-            // cosine interpolation
-            let TLTR = coserp(dotTl, dotTr, center[0]/cellsize)
-            // console.log(dotTl, dotTr, center[0], TLTR)
-            let BLBR = coserp(dotBl, dotBr, center[0]/cellsize)
-            // console.log(dotBl, dotBr, center[1], BLBR)
-            let value = coserp(TLTR, BLBR, center[1]/cellsize)
-            // console.log(value, x,y, j,i)
-            
-            let color = Math.floor(255*quinticFade((value*brightness+0.3)))
-            // perlin[y][x][i][j]  = [color,color,color];
-            // console.log(i, j, perlin[y][x][i][j].toString())
-            ctx.fillStyle = new Color(color,color,color);
-            ctx.fillRect(j*resolution+x*cellsize,i*resolution+y*cellsize, resolution, resolution);
-        }
-    }
+for (let i = 0; i < 256; i ++) {
+    p[ i ] = p[ i + 256] = Math.floor( Math.random() * 256 );
 }
 
-function matrixToPNG(matrix, pixelSize = 1) {
-    let renderTime = performance.now();
-    // calculate for the grid
-    for (let y = 0; y < gridLength; y++) {
-        for (let x = 0; x < gridLength; x++) {
-
-            // calculate for the points of the cell
-            let tl = [ x ,  y ]
-            let tr = [x+1,  y ]
-            let bl = [ x , y+1] 
-            let br = [x+1, y+1] 
-            
-            // console.log(bl, br, tl, tr);
-            // ctx.sbrokeStyle = '#00FF00';
-            // console.log(bl[0]*gridLength, bl[1]*gridLength, tr[0]*gridLength, tr[1]*gridLength)
-            // ctx.sbrokeRect(bl[0]*cellLength, bl[1]*cellLength, cellsize, cellsize);
-
-            // // transform each point to a random vector
-
-            // ctx.sbrokeStyle = '#FF0000';
-            let tlVec = pseudoRndVec(tl) //[Math.cos(pseudoRnd(3*tl[0]+tl[1]*cellsize)*2*Math.PI), Math.sin(pseudoRnd(3*tl[0]+tl[1]*cellsize)*2*Math.PI)]// rotateVector([-1,-1], *gridLength+x) * 2*Math.PI) 
-            // ctx.beginPath();
-            // ctx.moveTo(tl[0]*cellsize, tl[1]*cellsize);
-            // ctx.lineTo(tl[0]*cellsize+tlVec[0]*cellsize, tl[1]*cellsize+tlVec[1]*cellsize);
-            // ctx.stroke();
-            let trVec = pseudoRndVec(tr) //[Math.cos(pseudoRnd(3*tr[0]+tr[1]*cellsize)*2*Math.PI), Math.sin(pseudoRnd(3*tr[0]+tr[1]*cellsize)*2*Math.PI)]// rotateVector([ 1,-1], *gridLength+x+1) * 2*Math.PI) 
-            // ctx.beginPath();
-            // ctx.moveTo(tr[0]*cellsize, tr[1]*cellsize);
-            // ctx.lineTo(tr[0]*cellsize+trVec[0]*cellsize, tr[1]*cellsize+trVec[1]*cellsize);
-            // ctx.stroke();
-            let blVec = pseudoRndVec(bl) //[Math.cos(pseudoRnd(3*bl[0]+bl[1]*cellsize)*2*Math.PI), Math.sin(pseudoRnd(3*bl[0]+bl[1]*cellsize)*2*Math.PI)]// rotateVector([-1, 1],  * 2*Math.PI) 
-            // ctx.beginPath();
-            // ctx.moveTo(bl[0]*cellsize, bl[1]*cellsize);
-            // ctx.lineTo(bl[0]*cellsize+blVec[0]*cellsize, bl[1]*cellsize+blVec[1]*cellsize);
-            // ctx.stroke();
-            let brVec = pseudoRndVec(br) //[Math.cos(pseudoRnd(3*br[0]+br[1]*cellLength)*2*Math.PI), Math.sin(pseudoRnd(3*br[0]+br[1]*cellLength)*2*Math.PI)]// rotateVector([ 1, 1], 1) * 2*Math.PI)
-            // ctx.beginPath();
-            // ctx.moveTo(br[0]*cellsize, br[1]*cellsize);
-            // ctx.lineTo(br[0]*cellsize+brVec[0]*cellsize, br[1]*cellsize+brVec[1]*cellsize);
-            // ctx.stroke();
-
-            // calculate the gradient for the cell
-            cellEvaluation(x,y, {bl:blVec, br:brVec, tl:tlVec, tr:trVec}) 
-        }
+function OctavePerlin(x, y, z, octaves, persistence) {
+    let total = 0;
+    let frequency = 1;
+    let amplitude = 1;
+    let maxValue = 0;  // Used for normalizing result to 0.0 - 1.0
+    for(let i = 0; i < octaves; i++) {
+        total += noise(x * frequency, y * frequency, z * frequency) * amplitude;
+        
+        maxValue += amplitude;
+        
+        amplitude *= persistence;
+        frequency /= 2;
     }
-    console.log(Math.floor(performance.now() - renderTime));
-    // console.log(perlin)
-    // // Convert canvas to PNG data URL
-    // const dataURL = canvas.toDataURL('image/png');
     
-    // // Create a downloadable link
-    // const link = document.createElement('a');
-    // link.download = 'matrix.png';
-    // link.href = dataURL;
-    // link.click();
+    return total/maxValue;
 }
 
-matrixToPNG(perlin); // Creates a 3x3 PNG with 50x50 pixel squares
+function cellEvaluation(){
+    let calcTime = performance.now();
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++){
+            // let value = OctavePerlin(x*resolution, y*resolution, noiseSize, 1);
+            let value = noise(x*resolution, y*resolution, 1);
+            perlin[y*canvas.width+x] = Math.floor(value * 255);
+        }
+    }
+    console.log("Calculation Time:", Math.floor(performance.now() - calcTime));
+}
+
+cellEvaluation()
+
+function matrixToPNG() {
+    const imageData = ctx.createImageData(canvas.width, canvas.height);
+    const d = imageData.data;
+
+    let renderTime = performance.now();
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+            const m = perlin[y * canvas.width + x];
+            const index = (y * canvas.width + x) * 4;
+            d[index] = m;
+            d[index + 1] = m;
+            d[index + 2] = m;
+            d[index + 3] = 255;
+        }
+    }
+    console.log("Render Time:", Math.floor(performance.now() - renderTime));
+
+    ctx.putImageData(imageData, 0, 0);
+}
+
+matrixToPNG();
