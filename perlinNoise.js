@@ -2,6 +2,18 @@ function lerp(a, b, t){
     return a + t * (b - a);
 }
 
+function interpolateColor(color1, color2, t) {
+    // Ensure t is between 0 and 1
+    t = Math.max(0, Math.min(1, t));
+
+    // Interpolate each color component (red, green, blue)
+    const r = Math.round(color1[0] + (color2[0] - color1[0]) * t);
+    const g = Math.round(color1[1] + (color2[1] - color1[1]) * t);
+    const b = Math.round(color1[2] + (color2[2] - color1[2]) * t);
+
+    return [r, g, b];
+}
+
 function quinticFade(x, min=0, max=1){
     // x = clamp((x - min) / (max - min));
     return x * x * x * (10.0 + x * (-15.0 + x * 6.0));
@@ -84,11 +96,33 @@ function grad(hash, x, y, z)
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-canvas.width = window.innerWidth * window.devicePixelRatio   || 1
-canvas.height = window.innerHeight * window.devicePixelRatio || 1
+canvas.width = 100  // window.innerWidth * window.devicePixelRatio   || 1
+canvas.height = 100 //window.innerHeight * window.devicePixelRatio || 1
 
-const noiseSize = 4   // noise size
-const resolution = 2**noiseSize/Math.max(canvas.width, canvas.height)
+console.log(canvas.width, canvas.height)
+
+const imageData = ctx.createImageData(canvas.width, canvas.height);
+const imageDataArray = imageData.data;
+
+var gui = new dat.gui.GUI();
+
+var noiseGui = {
+    FPS: 60,
+    Speed: 1,
+    noiseSize: 2,
+    OctaveNoise: false,
+    Fogness: 1,
+    Color1: [255, 255, 255],
+    Color2: [0, 0, 0 ]
+};
+
+var FPS = gui.add(noiseGui, 'FPS')
+var noiseSize = gui.add(noiseGui, 'noiseSize').min(1).max(8).step(1); // noise size
+var speed = gui.add(noiseGui, 'Speed').min(0).max(3).step(0.1);
+var isOctaveNoiseOn = gui.add(noiseGui, 'OctaveNoise');
+var fogness = gui.add(noiseGui, 'Fogness').min(0).max(3).step(0.25);
+var color1 = gui.addColor(noiseGui, 'Color1');
+var color2 = gui.addColor(noiseGui, 'Color2');
 
 let perlin = new Array(canvas.height*canvas.width).fill(0);
 
@@ -115,38 +149,69 @@ function OctavePerlin(x, y, z, octaves, persistence) {
     return total/maxValue;
 }
 
-function cellEvaluation(){
-    let calcTime = performance.now();
+function cellEvaluation(z = 1){
+    let resolution = 2**noiseSize.getValue()/Math.max(canvas.width, canvas.height)
+    let value = 0;
     for (let y = 0; y < canvas.height; y++) {
         for (let x = 0; x < canvas.width; x++){
-            // let value = OctavePerlin(x*resolution, y*resolution, noiseSize, 1);
-            let value = noise(x*resolution, y*resolution, 1);
-            perlin[y*canvas.width+x] = Math.floor(value * 255);
+            if(isOctaveNoiseOn.getValue()){
+                value = OctavePerlin(x*resolution, y*resolution, z*resolution, noiseSize.getValue(), fogness.getValue());
+            }
+            else{
+                value = noise(x*resolution, y*resolution, z*resolution);
+            }
+            perlin[y*canvas.width+x] = value;
         }
     }
-    console.log("Calculation Time:", Math.floor(performance.now() - calcTime));
 }
 
+let calcTime = performance.now();
 cellEvaluation()
+console.log("Calculation Time:", Math.floor(performance.now() - calcTime));
 
 function matrixToPNG() {
-    const imageData = ctx.createImageData(canvas.width, canvas.height);
-    const d = imageData.data;
-
-    let renderTime = performance.now();
     for (let y = 0; y < canvas.height; y++) {
         for (let x = 0; x < canvas.width; x++) {
-            const m = perlin[y * canvas.width + x];
-            const index = (y * canvas.width + x) * 4;
-            d[index] = m;
-            d[index + 1] = m;
-            d[index + 2] = m;
-            d[index + 3] = 255;
+            let val = perlin[y * canvas.width + x];
+            const color = interpolateColor(color1.getValue(), color2.getValue(), val)
+            let index = (y * canvas.width + x) * 4;
+            imageDataArray[index] = color[0];
+            imageDataArray[index + 1] = color[1];
+            imageDataArray[index + 2] = color[2];
+            imageDataArray[index + 3] = 255;
         }
     }
-    console.log("Render Time:", Math.floor(performance.now() - renderTime));
-
     ctx.putImageData(imageData, 0, 0);
 }
 
+let renderTime = performance.now();
 matrixToPNG();
+console.log("Render Time:", Math.floor(performance.now() - renderTime));
+
+// simple function to animate the noise
+let change = 1
+let frameCount = 0;
+let renderSum = 0;
+let t,interval = 16;
+
+function animateNoise() {
+    let lastFrameTime = performance.now();
+    cellEvaluation(change)
+    matrixToPNG()
+    renderSum += performance.now() - lastFrameTime
+    frameCount++;
+
+    // Update FPS every second
+    if (frameCount >= 100) {
+        FPS.setValue(Math.round((frameCount * 1000) / (renderSum)));
+        frameCount = 0;
+        renderSum = 0;
+    }
+    change+=speed.getValue()
+    t = 1000/FPS.getValue();
+    // console.log(t)
+    clearInterval(interval);
+    interval = setInterval(animateNoise, t);
+}
+
+animateNoise()
