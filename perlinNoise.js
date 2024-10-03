@@ -181,7 +181,7 @@ console.log("Render Time:", Math.floor(performance.now() - renderTime));
 let change = 1
 let frameCount = 0;
 let renderSum = 0;
-let t,interval = 16;
+let t = 16;
 
 function animateNoise() {
     let lastFrameTime = performance.now();
@@ -199,8 +199,7 @@ function animateNoise() {
     change+=speed.getValue()
     t = 1000/FPS.getValue() > 16 ? 1000/FPS.getValue() : 16 ;
     // console.log(t)
-    clearInterval(interval);
-    interval = setInterval(animateNoise, t);
+    setTimeout(animateNoise, t);
 }
 
-animateNoise()
+setTimeout(animateNoise, t);
