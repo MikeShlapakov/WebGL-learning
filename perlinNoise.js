@@ -32,13 +32,14 @@ function noise(x, y, z){
     let xi = x & 255;                              // Calculate the "unit cube" that the point asked will be located in
     let yi = y & 255;                              // The left bound is ( |_x_|,|_y_|,|_z_| ) and the right bound is that
     let zi = z & 255;                              // plus 1.  Next we calculate the location (from 0.0 to 1.0) in that cube.
-    let xf = x - Math.floor(x);
-    let yf = y - Math.floor(y);
-    let zf = z - Math.floor(z);
+    
+    x -= Math.floor(x);
+    y -= Math.floor(y);
+    z -= Math.floor(z);
 
-    let u = quinticFade(xf)
-    let v = quinticFade(yf)
-    let w = quinticFade(zf)
+    let u = quinticFade(x)
+    let v = quinticFade(y)
+    let w = quinticFade(z)
 
     let aaa = p[p[p[ xi ]+  yi ]+  zi ];
     let aba = p[p[p[ xi ]+ yi+1]+  zi ];
@@ -49,55 +50,43 @@ function noise(x, y, z){
     let bab = p[p[p[xi+1]+  yi ]+ zi+1];
     let bbb = p[p[p[xi+1]+ yi+1]+ zi+1];
 
-    let x1 = lerp(  grad (aaa, xf  , yf  , zf),            // The gradient function calculates the dot product between a pseudorandom
-                    grad (baa, xf-1, yf  , zf),            // gradient vector and the vector from the input coordinate to the 8
+    let x1 = lerp(  grad (aaa, x  , y  , z),            // The gradient function calculates the dot product between a pseudorandom
+                    grad (baa, x-1, y  , z),            // gradient vector and the vector from the input coordinate to the 8
                     u);                                    // surrounding points in its unit cube.
-    let x2 = lerp(  grad (aba, xf  , yf-1, zf),            // This is all then lerped together as a sort of weighted average based on the faded (u,v,w)
-                    grad (bba, xf-1, yf-1, zf),            // values we made earlier.
+    let x2 = lerp(  grad (aba, x  , y-1, z),            // This is all then lerped together as a sort of weighted average based on the faded (u,v,w)
+                    grad (bba, x-1, y-1, z),            // values we made earlier.
                     u);
     let y1 = lerp(x1, x2, v);
 
-    x1 = lerp(  grad (aab, xf  , yf  , zf-1),
-                grad (bab, xf-1, yf  , zf-1),
+    x1 = lerp(  grad (aab, x  , y  , z-1),
+                grad (bab, x-1, y  , z-1),
                 u);
-    x2 = lerp( grad (abb, xf  , yf-1, zf-1),
-                grad (bbb, xf-1, yf-1, zf-1),
+    x2 = lerp( grad (abb, x  , y-1, z-1),
+                grad (bbb, x-1, y-1, z-1),
                 u);
     let y2 = lerp (x1, x2, v);
     
     return (lerp (y1, y2, w)+1)/2;    
 }
 
-function grad(hash, x, y, z)
-{
-    switch(hash & 0xF)
-    {
-        case 0x0: return  x + y;
-        case 0x1: return -x + y;
-        case 0x2: return  x - y;
-        case 0x3: return -x - y;
-        case 0x4: return  x + z;
-        case 0x5: return -x + z;
-        case 0x6: return  x - z;
-        case 0x7: return -x - z;
-        case 0x8: return  y + z;
-        case 0x9: return -y + z;
-        case 0xA: return  y - z;
-        case 0xB: return -y - z;
-        case 0xC: return  y + x;
-        case 0xD: return -y + z;
-        case 0xE: return  y - x;
-        case 0xF: return -y - z;
-        default: return 0; // never happens
-    }
+const gradients = [
+    [1,1,0], [-1,1,0], [1,-1,0], [-1,-1,0],
+    [1,0,1], [-1,0,1], [1,0,-1], [-1,0,-1],
+    [0,1,1], [0,-1,1], [0,1,-1], [0,-1,-1],
+    [1,1,0], [0,-1,1], [-1,1,0], [0,-1,-1]
+];
+
+function grad(hash, x, y, z) {
+    const g = gradients[hash & 0xF];
+    return g[0] * x + g[1] * y + g[2] * z;
 }
 
 // Create a canvas element
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-canvas.width = 100  // window.innerWidth * window.devicePixelRatio   || 1
-canvas.height = 100 //window.innerHeight * window.devicePixelRatio || 1
+canvas.width = 2**9  // window.innerWidth * window.devicePixelRatio   || 1
+canvas.height = 2**9 //window.innerHeight * window.devicePixelRatio || 1
 
 console.log(canvas.width, canvas.height)
 
@@ -124,7 +113,7 @@ var fogness = gui.add(noiseGui, 'Fogness').min(0).max(3).step(0.25);
 var color1 = gui.addColor(noiseGui, 'Color1');
 var color2 = gui.addColor(noiseGui, 'Color2');
 
-let perlin = new Array(canvas.height*canvas.width).fill(0);
+let perlin = new Float32Array(canvas.height*canvas.width);
 
 let p = new Array(512);
 
@@ -208,7 +197,7 @@ function animateNoise() {
         renderSum = 0;
     }
     change+=speed.getValue()
-    t = 1000/FPS.getValue();
+    t = 1000/FPS.getValue() > 16 ? 1000/FPS.getValue() : 16 ;
     // console.log(t)
     clearInterval(interval);
     interval = setInterval(animateNoise, t);
