@@ -28,45 +28,54 @@ function clamp(value) {
     return Math.max(0, Math.min(255, value));
 }
 
-function noise(x, y, z){
-    let xi = x & 255;                              // Calculate the "unit cube" that the point asked will be located in
-    let yi = y & 255;                              // The left bound is ( |_x_|,|_y_|,|_z_| ) and the right bound is that
-    let zi = z & 255;                              // plus 1.  Next we calculate the location (from 0.0 to 1.0) in that cube.
+class PerlinNoise{
+    constructor(r = Math) {
+        this.p = new Array(512);
+        for (let i = 0; i < 256; i ++) {
+            this.p[ i ] = this.p[ i + 256] = Math.floor( r.random() * 256 );
+        }
+    }
+
+    noise(x, y, z){
+        let xi = x & 255;                              // Calculate the "unit cube" that the point asked will be located in
+        let yi = y & 255;                              // The left bound is ( |_x_|,|_y_|,|_z_| ) and the right bound is that
+        let zi = z & 255;                              // plus 1.  Next we calculate the location (from 0.0 to 1.0) in that cube.
+        
+        x -= Math.floor(x);
+        y -= Math.floor(y);
+        z -= Math.floor(z);
     
-    x -= Math.floor(x);
-    y -= Math.floor(y);
-    z -= Math.floor(z);
-
-    let u = quinticFade(x)
-    let v = quinticFade(y)
-    let w = quinticFade(z)
-
-    let aaa = p[p[p[ xi ]+  yi ]+  zi ];
-    let aba = p[p[p[ xi ]+ yi+1]+  zi ];
-    let aab = p[p[p[ xi ]+  yi ]+ zi+1];
-    let abb = p[p[p[ xi ]+ yi+1]+ zi+1];
-    let baa = p[p[p[xi+1]+  yi ]+  zi ];
-    let bba = p[p[p[xi+1]+ yi+1]+  zi ];
-    let bab = p[p[p[xi+1]+  yi ]+ zi+1];
-    let bbb = p[p[p[xi+1]+ yi+1]+ zi+1];
-
-    let x1 = lerp(  grad (aaa, x  , y  , z),            // The gradient function calculates the dot product between a pseudorandom
-                    grad (baa, x-1, y  , z),            // gradient vector and the vector from the input coordinate to the 8
-                    u);                                    // surrounding points in its unit cube.
-    let x2 = lerp(  grad (aba, x  , y-1, z),            // This is all then lerped together as a sort of weighted average based on the faded (u,v,w)
-                    grad (bba, x-1, y-1, z),            // values we made earlier.
+        let u = quinticFade(x)
+        let v = quinticFade(y)
+        let w = quinticFade(z)
+    
+        let aaa = this.p[this.p[this.p[ xi ]+  yi ]+  zi ];
+        let aba = this.p[this.p[this.p[ xi ]+ yi+1]+  zi ];
+        let aab = this.p[this.p[this.p[ xi ]+  yi ]+ zi+1];
+        let abb = this.p[this.p[this.p[ xi ]+ yi+1]+ zi+1];
+        let baa = this.p[this.p[this.p[xi+1]+  yi ]+  zi ];
+        let bba = this.p[this.p[this.p[xi+1]+ yi+1]+  zi ];
+        let bab = this.p[this.p[this.p[xi+1]+  yi ]+ zi+1];
+        let bbb = this.p[this.p[this.p[xi+1]+ yi+1]+ zi+1];
+    
+        let x1 = lerp(  grad (aaa, x  , y  , z),            // The gradient function calculates the dot product between a pseudorandom
+                        grad (baa, x-1, y  , z),            // gradient vector and the vector from the input coordinate to the 8
+                        u);                                    // surrounding points in its unit cube.
+        let x2 = lerp(  grad (aba, x  , y-1, z),            // This is all then lerped together as a sort of weighted average based on the faded (u,v,w)
+                        grad (bba, x-1, y-1, z),            // values we made earlier.
+                        u);
+        let y1 = lerp(x1, x2, v);
+    
+        x1 = lerp(  grad (aab, x  , y  , z-1),
+                    grad (bab, x-1, y  , z-1),
                     u);
-    let y1 = lerp(x1, x2, v);
-
-    x1 = lerp(  grad (aab, x  , y  , z-1),
-                grad (bab, x-1, y  , z-1),
-                u);
-    x2 = lerp( grad (abb, x  , y-1, z-1),
-                grad (bbb, x-1, y-1, z-1),
-                u);
-    let y2 = lerp (x1, x2, v);
-    
-    return (lerp (y1, y2, w)+1)/2;    
+        x2 = lerp( grad (abb, x  , y-1, z-1),
+                    grad (bbb, x-1, y-1, z-1),
+                    u);
+        let y2 = lerp (x1, x2, v);
+        
+        return (lerp (y1, y2, w)+1)/2;    
+    }
 }
 
 const gradients = [
@@ -85,8 +94,8 @@ function grad(hash, x, y, z) {
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-canvas.width = 2**9  // window.innerWidth * window.devicePixelRatio   || 1
-canvas.height = 2**9 //window.innerHeight * window.devicePixelRatio || 1
+canvas.width = 2**8  // window.innerWidth * window.devicePixelRatio   || 1
+canvas.height = 2**8 //window.innerHeight * window.devicePixelRatio || 1
 
 console.log(canvas.width, canvas.height)
 
@@ -115,11 +124,7 @@ var color2 = gui.addColor(noiseGui, 'Color2');
 
 let perlin = new Float32Array(canvas.height*canvas.width);
 
-let p = new Array(512);
-
-for (let i = 0; i < 256; i ++) {
-    p[ i ] = p[ i + 256] = Math.floor( Math.random() * 256 );
-}
+let perlinNoise = new PerlinNoise();
 
 function OctavePerlin(x, y, z, octaves, persistence) {
     let total = 0;
@@ -127,7 +132,7 @@ function OctavePerlin(x, y, z, octaves, persistence) {
     let amplitude = 1;
     let maxValue = 0;  // Used for normalizing result to 0.0 - 1.0
     for(let i = 0; i < octaves; i++) {
-        total += noise(x * frequency, y * frequency, z * frequency) * amplitude;
+        total += perlinNoise.noise(x * frequency, y * frequency, z * frequency) * amplitude;
         
         maxValue += amplitude;
         
@@ -147,7 +152,7 @@ function cellEvaluation(z = 1){
                 value = OctavePerlin(x*resolution, y*resolution, z*resolution, noiseSize.getValue(), fogness.getValue());
             }
             else{
-                value = noise(x*resolution, y*resolution, z*resolution);
+                value = perlinNoise.noise(x*resolution, y*resolution, z*resolution);
             }
             perlin[y*canvas.width+x] = value;
         }
