@@ -12,9 +12,9 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 /*========== Defining and storing the geometry ==========*/
 
-let height = 2
-let n = 16;
-let chunks = 4;
+let height = 32
+let n = 32;
+let chunks = 1;
 
 // Function to get vertices and determine visible faces for a cube
 function get_cube_data(x, y, z, size = 1) {
@@ -25,22 +25,22 @@ function get_cube_data(x, y, z, size = 1) {
     let visibleFaces = [];
 
     // Check each face
-    if (y === 0 || !visibilityGrid[x][y-1][z]) {
+    if (y === 0 || !visibilityGrid[x][y-1][z].id) {
         visibleFaces.push('bottom');
     }
-    if (y === height - 1 || !visibilityGrid[x][y+1][z]) {
+    if (y === height - 1 || !visibilityGrid[x][y+1][z].id) {
         visibleFaces.push('top');
     }
-    if (x === 0 || !visibilityGrid[x-1][y][z]) {
+    if (x === 0 || !visibilityGrid[x-1][y][z].id) {
         visibleFaces.push('left');
     }
-    if (x === n * chunks - 1 || !visibilityGrid[x+1][y][z]) {
+    if (x === n * chunks - 1 || !visibilityGrid[x+1][y][z].id) {
         visibleFaces.push('right');
     }
-    if (z === 0 || !visibilityGrid[x][y][z-1]) {
+    if (z === 0 || !visibilityGrid[x][y][z-1].id) {
         visibleFaces.push('back');
     }
-    if (z === n * chunks - 1 || !visibilityGrid[x][y][z+1]) {
+    if (z === n * chunks - 1 || !visibilityGrid[x][y][z+1].id) {
         visibleFaces.push('front');
     }
 
@@ -54,6 +54,9 @@ function get_cube_data(x, y, z, size = 1) {
                     x + half, y + half, z - half,
                     x - half, y + half, z - half
                 );
+                colors = colors.concat(
+                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],
+                );
                 break;
             case 'front':
                 vertices.push(
@@ -61,6 +64,9 @@ function get_cube_data(x, y, z, size = 1) {
                     x - half, y - half, z + half,
                     x - half, y + half, z + half,
                     x + half, y + half, z + half
+                );
+                colors = colors.concat(
+                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
                 );
                 break;
             case 'left':
@@ -70,6 +76,9 @@ function get_cube_data(x, y, z, size = 1) {
                     x - half, y + half, z - half,
                     x - half, y + half, z + half
                 );
+                colors = colors.concat(
+                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],
+                );
                 break;
             case 'right':
                 vertices.push(
@@ -77,6 +86,9 @@ function get_cube_data(x, y, z, size = 1) {
                     x + half, y - half, z + half,
                     x + half, y + half, z + half,
                     x + half, y + half, z - half
+                );
+                colors = colors.concat(
+                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
                 );
                 break;
             case 'bottom':
@@ -86,6 +98,9 @@ function get_cube_data(x, y, z, size = 1) {
                     x - half, y - half, z + half,
                     x + half, y - half, z + half
                 );
+                colors = colors.concat(
+                    [0,0,0, 0,0,0, 0,0,0, 0,0,0],
+                );
                 break;
             case 'top':
                 vertices.push(
@@ -94,10 +109,13 @@ function get_cube_data(x, y, z, size = 1) {
                     x - half, y + half, z - half,
                     x + half, y + half, z - half
                 );
+                colors = colors.concat(
+                    [0,1,0, 0,1,0, 0,1,0, 0,1,0],
+                );
                 break;
         }
-        colors = colors.concat([1,0,0, 0,1,0, 0,0,1, 0,1,1]);
-        //colors = colors.concat([x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks), x/(n*chunks),y/(n),z/(n*chunks)]);
+        // colors = colors.concat([1,0,0, 0,1,0, 0,0,1, 0,1,1]);
+        // colors = colors.concat([x/(n*chunks),y/(height),z/(n*chunks), x/(n*chunks),y/(height),z/(n*chunks), x/(n*chunks),y/(height),z/(n*chunks), x/(n*chunks),y/(height),z/(n*chunks)]);
         indices = indices.concat([
             vertexCount, vertexCount + 2, vertexCount + 1,
             vertexCount, vertexCount + 3, vertexCount + 2
@@ -109,23 +127,71 @@ function get_cube_data(x, y, z, size = 1) {
 }
 
 // 3D array to store cube visibility
-let visibilityGrid = new Array(n * chunks).fill(null).map(() => 
-    new Array(height).fill(null).map(() => 
-        new Array(n * chunks).fill(true)
-    )
-);
+let visibilityGrid = []
+// for(let w = 0; w < chunks; w++){
+//     const chunkW = []
+//     for(let l = 0; l < chunks; l++){
+//         const chunkL = []
+        for(let x = 0; x < n; x++){
+            const slice = []
+            for(let y = 0; y < height; y++){
+                const row = []
+                for(let z = 0; z < n; z++){
+                    row.push({
+                        id : 0,
+                    })
+                }
+                slice.push(row)
+            }
+    //         chunkL.push(chunkW)
+    //     }
+    //     chunkW.push(chunkL)
+    // }
+    visibilityGrid.push(slice)
+}
 
+const params = {
+    terrain: {
+        scale: 10,
+        offset : 0,
+        magnitude: 0.7
+    },
+}
+
+let rng = new RNG(123);
+let perlinNoise = new PerlinNoise(rng);
+
+for(let x = 0; x < n; x++){
+    for(let z = 0; z < n; z++){
+        const value = perlinNoise.noise(
+            x / params.terrain.scale,
+            z / params.terrain.scale,
+            1
+        )
+
+        const scalsedNoise = value * params.terrain.magnitude + params.terrain.offset
+
+        const h = Math.max(0, Math.min(height - 1, Math.floor(scalsedNoise*height)))
+
+        for(let y = 0; y <= h; y++){
+            visibilityGrid[x][y][z].id = 1;
+        }
+    }
+}
 // Function to check if a cube is visible (not fully occluded)
 function isCubeVisible(x, y, z) {
+    if (visibilityGrid[x][y][z].id == 0) {
+        return false
+    }
     // Check if it's on the edge of the grid
     if (x === 0 || x === n*chunks - 1 || y === 0 || y === height - 1 || z === 0 || z === n*chunks - 1) {
         return true;
     }
     // console.log(x,y,z, visibilityGrid)
     // Check if any neighboring cube is missing
-    return !visibilityGrid[x-1][y][z] || !visibilityGrid[x+1][y][z] ||
-           !visibilityGrid[x][y-1][z] || !visibilityGrid[x][y+1][z] ||
-           !visibilityGrid[x][y][z-1] || !visibilityGrid[x][y][z+1];
+    return !visibilityGrid[x-1][y][z].id || !visibilityGrid[x+1][y][z].id ||
+           !visibilityGrid[x][y-1][z].id || !visibilityGrid[x][y+1][z].id ||
+           !visibilityGrid[x][y][z-1].id || !visibilityGrid[x][y][z+1].id;
 }
 
 let vertices = [];
@@ -133,15 +199,15 @@ let colors = [];
 let indices = [];
 let k = 0;
 
-for(let w = 0; w < chunks; w++){
-    for(let l = 0; l < chunks; l++){
+// for(let w = 0; w < chunks; w++){
+//     for(let l = 0; l < chunks; l++){
         for(let x = 0; x < n; x++){
-            // console.log(((l+w*chunks)*n + x)/(chunks*chunks*n) * 100)
+            console.log((x)/(n) * 100)
             for(let y = 0; y < height; y++){
                 for(let z = 0; z < n; z++){
-                    if (isCubeVisible(w * n + x, y, l * n + z)) {
+                    if (isCubeVisible(x, y, z)) {
                         // console.log(x,y,zCoord)
-                        let cubeData = get_cube_data(w * n + x, y, l * n + z, 1);
+                        let cubeData = get_cube_data(x, y, z, 1);
                         vertices = vertices.concat(cubeData.vertices);
                         colors = colors.concat(cubeData.colors);
                         indices = indices.concat(cubeData.indices.map(index => index + k));
@@ -152,8 +218,8 @@ for(let w = 0; w < chunks; w++){
                 }
             }
         }
-    }
-}
+//     }
+// }
 
 console.log("Number of vertices:", vertices.length);
 console.log("Number of indices:", indices.length);

@@ -90,121 +90,125 @@ function grad(hash, x, y, z) {
     return g[0] * x + g[1] * y + g[2] * z;
 }
 
-// Create a canvas element
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+function drawPerlin(){
+    // Create a canvas element
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-canvas.width = 2**8  // window.innerWidth * window.devicePixelRatio   || 1
-canvas.height = 2**8 //window.innerHeight * window.devicePixelRatio || 1
+    canvas.width = 2**8  // window.innerWidth * window.devicePixelRatio   || 1
+    canvas.height = 2**8 //window.innerHeight * window.devicePixelRatio || 1
 
-console.log(canvas.width, canvas.height)
+    console.log(canvas.width, canvas.height)
 
-const imageData = ctx.createImageData(canvas.width, canvas.height);
-const imageDataArray = imageData.data;
+    const imageData = ctx.createImageData(canvas.width, canvas.height);
+    const imageDataArray = imageData.data;
 
-var gui = new dat.gui.GUI();
+    var gui = new dat.gui.GUI();
 
-var noiseGui = {
-    FPS: 60,
-    Speed: 1,
-    noiseSize: 2,
-    OctaveNoise: false,
-    Fogness: 1,
-    Color1: [255, 255, 255],
-    Color2: [0, 0, 0 ]
-};
+    var noiseGui = {
+        FPS: 60,
+        Speed: 1,
+        noiseSize: 2,
+        OctaveNoise: false,
+        Fogness: 1,
+        Color1: [255, 255, 255],
+        Color2: [0, 0, 0 ]
+    };
 
-var FPS = gui.add(noiseGui, 'FPS')
-var noiseSize = gui.add(noiseGui, 'noiseSize').min(1).max(8).step(1); // noise size
-var speed = gui.add(noiseGui, 'Speed').min(0).max(3).step(0.1);
-var isOctaveNoiseOn = gui.add(noiseGui, 'OctaveNoise');
-var fogness = gui.add(noiseGui, 'Fogness').min(0).max(3).step(0.25);
-var color1 = gui.addColor(noiseGui, 'Color1');
-var color2 = gui.addColor(noiseGui, 'Color2');
+    var FPS = gui.add(noiseGui, 'FPS')
+    var noiseSize = gui.add(noiseGui, 'noiseSize').min(1).max(8).step(1); // noise size
+    var speed = gui.add(noiseGui, 'Speed').min(0).max(3).step(0.1);
+    var isOctaveNoiseOn = gui.add(noiseGui, 'OctaveNoise');
+    var fogness = gui.add(noiseGui, 'Fogness').min(0).max(3).step(0.25);
+    var color1 = gui.addColor(noiseGui, 'Color1');
+    var color2 = gui.addColor(noiseGui, 'Color2');
 
-let perlin = new Float32Array(canvas.height*canvas.width);
+    let perlin = new Float32Array(canvas.height*canvas.width);
 
-let perlinNoise = new PerlinNoise();
+    let perlinNoise = new PerlinNoise();
 
-function OctavePerlin(x, y, z, octaves, persistence) {
-    let total = 0;
-    let frequency = 1;
-    let amplitude = 1;
-    let maxValue = 0;  // Used for normalizing result to 0.0 - 1.0
-    for(let i = 0; i < octaves; i++) {
-        total += perlinNoise.noise(x * frequency, y * frequency, z * frequency) * amplitude;
+    function OctavePerlin(x, y, z, octaves, persistence) {
+        let total = 0;
+        let frequency = 1;
+        let amplitude = 1;
+        let maxValue = 0;  // Used for normalizing result to 0.0 - 1.0
+        for(let i = 0; i < octaves; i++) {
+            total += perlinNoise.noise(x * frequency, y * frequency, z * frequency) * amplitude;
+            
+            maxValue += amplitude;
+            
+            amplitude *= persistence;
+            frequency /= 2;
+        }
         
-        maxValue += amplitude;
-        
-        amplitude *= persistence;
-        frequency /= 2;
+        return total/maxValue;
     }
-    
-    return total/maxValue;
-}
 
-function cellEvaluation(z = 1){
-    let resolution = 2**noiseSize.getValue()/Math.max(canvas.width, canvas.height)
-    let value = 0;
-    for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < canvas.width; x++){
-            if(isOctaveNoiseOn.getValue()){
-                value = OctavePerlin(x*resolution, y*resolution, z*resolution, noiseSize.getValue(), fogness.getValue());
+    function cellEvaluation(z = 1){
+        let resolution = 2**noiseSize.getValue()/Math.max(canvas.width, canvas.height)
+        let value = 0;
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++){
+                if(isOctaveNoiseOn.getValue()){
+                    value = OctavePerlin(x*resolution, y*resolution, z*resolution, noiseSize.getValue(), fogness.getValue());
+                }
+                else{
+                    value = perlinNoise.noise(x*resolution, y*resolution, z*resolution);
+                }
+                perlin[y*canvas.width+x] = value;
             }
-            else{
-                value = perlinNoise.noise(x*resolution, y*resolution, z*resolution);
-            }
-            perlin[y*canvas.width+x] = value;
         }
     }
-}
 
-let calcTime = performance.now();
-cellEvaluation()
-console.log("Calculation Time:", Math.floor(performance.now() - calcTime));
+    let calcTime = performance.now();
+    cellEvaluation()
+    console.log("Calculation Time:", Math.floor(performance.now() - calcTime));
 
-function matrixToPNG() {
-    for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < canvas.width; x++) {
-            let val = perlin[y * canvas.width + x];
-            const color = interpolateColor(color1.getValue(), color2.getValue(), val)
-            let index = (y * canvas.width + x) * 4;
-            imageDataArray[index] = color[0];
-            imageDataArray[index + 1] = color[1];
-            imageDataArray[index + 2] = color[2];
-            imageDataArray[index + 3] = 255;
+    function matrixToPNG() {
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+                let val = perlin[y * canvas.width + x];
+                const color = interpolateColor(color1.getValue(), color2.getValue(), val)
+                let index = (y * canvas.width + x) * 4;
+                imageDataArray[index] = color[0];
+                imageDataArray[index + 1] = color[1];
+                imageDataArray[index + 2] = color[2];
+                imageDataArray[index + 3] = 255;
+            }
         }
+        ctx.putImageData(imageData, 0, 0);
     }
-    ctx.putImageData(imageData, 0, 0);
-}
 
-let renderTime = performance.now();
-matrixToPNG();
-console.log("Render Time:", Math.floor(performance.now() - renderTime));
+    let renderTime = performance.now();
+    matrixToPNG();
+    console.log("Render Time:", Math.floor(performance.now() - renderTime));
 
-// simple function to animate the noise
-let change = 1
-let frameCount = 0;
-let renderSum = 0;
-let t = 16;
+    // simple function to animate the noise
+    let change = 1
+    let frameCount = 0;
+    let renderSum = 0;
+    let t = 16;
 
-function animateNoise() {
-    let lastFrameTime = performance.now();
-    cellEvaluation(change)
-    matrixToPNG()
-    renderSum += performance.now() - lastFrameTime
-    frameCount++;
+    function animateNoise() {
+        let lastFrameTime = performance.now();
+        cellEvaluation(change)
+        matrixToPNG()
+        renderSum += performance.now() - lastFrameTime
+        frameCount++;
 
-    // Update FPS every second
-    if (frameCount >= 100) {
-        FPS.setValue(Math.round((frameCount * 1000) / (renderSum)));
-        frameCount = 0;
-        renderSum = 0;
+        // Update FPS every second
+        if (frameCount >= 100) {
+            FPS.setValue(Math.round((frameCount * 1000) / (renderSum)));
+            frameCount = 0;
+            renderSum = 0;
+        }
+        change+=speed.getValue()
+        t = 1000/FPS.getValue() > 16 ? 1000/FPS.getValue() : 16 ;
+        // console.log(t)
+        setTimeout(animateNoise, t);
     }
-    change+=speed.getValue()
-    t = 1000/FPS.getValue() > 16 ? 1000/FPS.getValue() : 16 ;
-    // console.log(t)
+
     setTimeout(animateNoise, t);
 }
 
-setTimeout(animateNoise, t);
+// drawPerlin()
