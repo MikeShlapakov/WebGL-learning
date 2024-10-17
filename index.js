@@ -15,27 +15,70 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-let height = 64
+let height = 32
 let n = 64;
 let chunks = 1;
 
-let vertices = [0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
-                -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
-                    0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
-                -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, 0.5,
-                -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5,
-                    0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5,
-                    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5,
-                -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5,
-                    0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
-                0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+let vertices = [ 0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
+                -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,
+                 0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
+                -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
+                -0.5, -0.5,  0.5, -0.5, -0.5, -0.5,
+                -0.5,  0.5, -0.5, -0.5,  0.5,  0.5,
+                 0.5, -0.5, -0.5,  0.5, -0.5,  0.5,
+                 0.5,  0.5,  0.5,  0.5,  0.5, -0.5,
+                -0.5, -0.5, -0.5,  0.5, -0.5, -0.5,
+                 0.5,  0.5, -0.5, -0.5,  0.5, -0.5,
+                 0.5, -0.5,  0.5, -0.5, -0.5,  0.5,
+                -0.5,  0.5,  0.5,  0.5,  0.5,  0.5
+]
 
-let indices = [0, 2, 1, 0, 3, 2,
+let indices = [ 0, 2, 1, 0, 3, 2,
                 4, 6, 5, 4, 7, 6,
                 8, 10, 9, 8, 11, 10, 
                 12, 14, 13, 12, 15, 14, 
                 16, 18, 17, 16, 19, 18, 
                 20, 22, 21, 20, 23, 22];
+
+var normals = [
+
+    // bottom
+    0, -1, 0,
+    0, -1, 0,
+    0, -1, 0,
+    0, -1, 0,
+
+    // top
+    0, 1, 0,
+    0, 1, 0,
+    0, 1, 0,
+    0, 1, 0,
+
+    // left
+    -1, 0, 0,
+    -1, 0, 0,
+    -1, 0, 0,
+    -1, 0, 0,
+
+    // right
+    1, 0, 0,
+    1, 0, 0,
+    1, 0, 0,
+    1, 0, 0,
+    
+    // back
+    0, 0, -1,
+    0, 0, -1,
+    0, 0, -1,
+    0, 0, -1,
+
+    // front
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+];
+
 let colors = [];
 
 console.log("Number of vertices:", vertices.length);
@@ -43,6 +86,7 @@ console.log("Number of indices:", indices.length);
 
 // Create and store data into vertex buffer
 var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
+gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
 
 // Create and store data into index buffer
 var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
@@ -64,32 +108,17 @@ gl.attachShader(shaderprogram, fragShader);
 gl.linkProgram(shaderprogram);
 
 /*======== Associating attributes to vertex shader =====*/
-var _Pmatrix = gl.getUniformLocation(shaderprogram, "Pmatrix");
-var _Vmatrix = gl.getUniformLocation(shaderprogram, "Vmatrix");
-var _Mmatrix = gl.getAttribLocation(shaderprogram, "Mmatrix");
+var _Pmatrix = gl.getUniformLocation(shaderprogram, "uPmatrix");
+var _Vmatrix = gl.getUniformLocation(shaderprogram, "uVmatrix");
+var _Mmatrix = gl.getAttribLocation(shaderprogram, "aMmatrix");
 
-gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-var _position = gl.getAttribLocation(shaderprogram, "position");
+var uAmbientLight = gl.getUniformLocation(shaderprogram, "uAmbientLight");
+var uLightColor = gl.getUniformLocation(shaderprogram, "uLightColor");
+var uLightDirection = gl.getUniformLocation(shaderprogram, "uLightDirection");
+
+var _position = gl.getAttribLocation(shaderprogram, "aPosition");
 gl.vertexAttribPointer(_position, 3, gl.FLOAT, false, 0, 0);
 gl.enableVertexAttribArray(_position);
-
-// setup matrices, one per instance
-const numInstances = n*height*n;
-// make a typed array with one view per matrix
-const matrixData = new Float32Array(numInstances * 16);
-
-const matrices = [];
-for (let i = 0; i < numInstances; ++i) {
-  matrices.push(new Float32Array(
-      matrixData.buffer,
-      i * 16 * 4,
-      16));
-}
-
-const matrixBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
-// just allocate the buffer
-gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
 
 /*========== Defining and storing the geometry ==========*/
 
@@ -296,6 +325,24 @@ function isCubeVisible(x, y, z) {
            !worldGrid[x][y][z-1].id || !worldGrid[x][y][z+1].id;
 }
 
+
+// setup matrices, one per instance
+const numInstances = n*height*n;
+// make a typed array with one view per matrix
+const matrixData = new Float32Array(numInstances * 16);
+
+const matrices = [];
+for (let i = 0; i < numInstances; ++i) {
+  matrices.push(new Float32Array(
+      matrixData.buffer,
+      i * 16 * 4,
+      16));
+}
+
+const matrixBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
+
 function generateMesh(){
     let countInstances = 0;
     // let colors = []
@@ -346,11 +393,19 @@ for (let i = 0; i < 4; ++i) {
     ext.vertexAttribDivisorANGLE(loc, 1);
 }
 
+var normals_buffer = createBufferFromArray(new Float32Array(normals), gl.ARRAY_BUFFER);
+gl.bindBuffer(gl.ARRAY_BUFFER, normals_buffer);
+
+var normalLocation = gl.getAttribLocation(shaderprogram, "aNormal");
+gl.vertexAttribPointer(normalLocation, 3, gl.FLOAT, false, 0, 0) ;
+gl.enableVertexAttribArray(normalLocation);
+// ext.vertexAttribDivisorANGLE(normalLocation, 1);
+
 // Create and store data into color buffer
 var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
 gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
 
-var _color = gl.getAttribLocation(shaderprogram, "color");
+var _color = gl.getAttribLocation(shaderprogram, "aColor");
 gl.vertexAttribPointer(_color, 4, gl.FLOAT, false, 0, 0) ;
 gl.enableVertexAttribArray(_color);
 ext.vertexAttribDivisorANGLE(_color, 1);
@@ -412,6 +467,7 @@ var precentage = {precent: 0}
 var obj = {
     FPS: 0,
     cameraPosition: {x: 0, y:1, z:1},
+    lightPosition: {x: 10, y:10, z:1, ambient: 1},
     FOV: 60,
     speed: 0.25,
     // rotationSpeed: 0.02, // Speed of rotation
@@ -427,9 +483,15 @@ gui.domElement.id = 'gui';
 var FPS = gui.add(obj, 'FPS')
 var cameraPositionFolder = gui.addFolder('Camera Position')
 cameraPositionFolder.add(obj.cameraPosition, 'x')
-cameraPositionFolder.add(obj.cameraPosition, 'y')  
+cameraPositionFolder.add(obj.cameraPosition, 'y')
 cameraPositionFolder.add(obj.cameraPosition, 'z')
 cameraPositionFolder.open()
+var lightPositionFolder = gui.addFolder('Light Position')
+lightPositionFolder.add(obj.lightPosition, 'x').min(-64).max(64).step(1);
+lightPositionFolder.add(obj.lightPosition, 'y').min(-64).max(64).step(1);
+lightPositionFolder.add(obj.lightPosition, 'z').min(-64).max(64).step(1);
+lightPositionFolder.add(obj.lightPosition, 'ambient').min(0).max(2).step(0.01);
+lightPositionFolder.open()
 var FOV = gui.add(obj, 'FOV').min(10).max(120).step(5);
 gui.add(obj, 'speed').min(0.01).max(1).step(0.01);
 gui.add(obj, 'zMax').min(10).max(500).step(10); // Increment amount
@@ -464,7 +526,12 @@ var animate = function(time) {
 
     gl.uniformMatrix4fv(_Pmatrix, false, proj_matrix);
     gl.uniformMatrix4fv(_Vmatrix, false, view_matrix);
-    // gl.uniformMatrix4fv(_Mmatrix, false, mo_matrix);
+    gl.uniform3f(uLightColor, obj.skyColor[0]/255, obj.skyColor[1]/255, obj.skyColor[2]/255);
+    gl.uniform3f(uLightColor, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
+    gl.uniform3fv(uLightDirection, normalize([obj.lightPosition.x,
+                                                obj.lightPosition.y,
+                                                obj.lightPosition.z]));
+    
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
     ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, numInstances);
