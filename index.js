@@ -15,11 +15,83 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-/*========== Defining and storing the geometry ==========*/
-
-let height = 32
-let n = 32;
+let height = 64
+let n = 64;
 let chunks = 1;
+
+let vertices = [0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
+                -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
+                    0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
+                -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, 0.5,
+                -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5,
+                    0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5,
+                    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5,
+                -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5,
+                    0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
+                0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+
+let indices = [0, 2, 1, 0, 3, 2,
+                4, 6, 5, 4, 7, 6,
+                8, 10, 9, 8, 11, 10, 
+                12, 14, 13, 12, 15, 14, 
+                16, 18, 17, 16, 19, 18, 
+                20, 22, 21, 20, 23, 22];
+let colors = [];
+
+console.log("Number of vertices:", vertices.length);
+console.log("Number of indices:", indices.length);
+
+// Create and store data into vertex buffer
+var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
+
+// Create and store data into index buffer
+var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
+
+/*=================== SHADERS =================== */
+
+var vertShader = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vertShader, document.getElementById("vertex-shader-3d").innerText);
+gl.compileShader(vertShader);
+
+var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fragShader, document.getElementById("fragment-shader-3d").innerText);
+gl.compileShader(fragShader);
+
+var shaderprogram = gl.createProgram();
+gl.attachShader(shaderprogram, vertShader);
+gl.attachShader(shaderprogram, fragShader);
+
+gl.linkProgram(shaderprogram);
+
+/*======== Associating attributes to vertex shader =====*/
+var _Pmatrix = gl.getUniformLocation(shaderprogram, "Pmatrix");
+var _Vmatrix = gl.getUniformLocation(shaderprogram, "Vmatrix");
+var _Mmatrix = gl.getAttribLocation(shaderprogram, "Mmatrix");
+
+gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+var _position = gl.getAttribLocation(shaderprogram, "position");
+gl.vertexAttribPointer(_position, 3, gl.FLOAT, false, 0, 0);
+gl.enableVertexAttribArray(_position);
+
+// setup matrices, one per instance
+const numInstances = n*height*n;
+// make a typed array with one view per matrix
+const matrixData = new Float32Array(numInstances * 16);
+
+const matrices = [];
+for (let i = 0; i < numInstances; ++i) {
+  matrices.push(new Float32Array(
+      matrixData.buffer,
+      i * 16 * 4,
+      16));
+}
+
+const matrixBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+// just allocate the buffer
+gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
+
+/*========== Defining and storing the geometry ==========*/
 
 // Function to get vertices and determine visible faces for a cube
 function get_cube_data(x, y, z, size = 1) {
@@ -30,22 +102,22 @@ function get_cube_data(x, y, z, size = 1) {
     let visibleFaces = [];
 
     // Check each face
-    if (y === 0 || !visibilityGrid[x][y-1][z].id) {
+    if (y === 0 || !worldGrid[x][y-1][z].id) {
         visibleFaces.push('bottom');
     }
-    if (y === height - 1 || !visibilityGrid[x][y+1][z].id) {
+    if (y === height - 1 || !worldGrid[x][y+1][z].id) {
         visibleFaces.push('top');
     }
-    if (x === 0 || !visibilityGrid[x-1][y][z].id) {
+    if (x === 0 || !worldGrid[x-1][y][z].id) {
         visibleFaces.push('left');
     }
-    if (x === n * chunks - 1 || !visibilityGrid[x+1][y][z].id) {
+    if (x === n * chunks - 1 || !worldGrid[x+1][y][z].id) {
         visibleFaces.push('right');
     }
-    if (z === 0 || !visibilityGrid[x][y][z-1].id) {
+    if (z === 0 || !worldGrid[x][y][z-1].id) {
         visibleFaces.push('back');
     }
-    if (z === n * chunks - 1 || !visibilityGrid[x][y][z+1].id) {
+    if (z === n * chunks - 1 || !worldGrid[x][y][z+1].id) {
         visibleFaces.push('front');
     }
 
@@ -132,27 +204,20 @@ function get_cube_data(x, y, z, size = 1) {
 }
 
 // 3D array to store cube visibility
-let visibilityGrid = []
-// for(let w = 0; w < chunks; w++){
-//     const chunkW = []
-//     for(let l = 0; l < chunks; l++){
-//         const chunkL = []
-        for(let x = 0; x < n; x++){
-            const slice = []
-            for(let y = 0; y < height; y++){
-                const row = []
-                for(let z = 0; z < n; z++){
-                    row.push({
-                        id : 0,
-                    })
-                }
-                slice.push(row)
-            }
-    //         chunkL.push(chunkW)
-    //     }
-    //     chunkW.push(chunkL)
-    // }
-    visibilityGrid.push(slice)
+let worldGrid = []
+for(let x = 0; x < n; x++){
+    const slice = []
+    for(let y = 0; y < height; y++){
+        const row = []
+        for(let z = 0; z < n; z++){
+            row.push({
+                id : 0,
+                instanceId: null
+            })
+        }
+        slice.push(row)
+    }
+    worldGrid.push(slice)
 }
 
 const params = {
@@ -174,13 +239,17 @@ function generateTerrain(){
                 z / params.terrain.scale,
                 1
             )
-
             const scalsedNoise = value * params.terrain.magnitude + params.terrain.offset
 
             const h = Math.max(0, Math.min(height - 1, Math.floor(scalsedNoise*height)))
 
-            for(let y = 0; y <= h; y++){
-                visibilityGrid[x][y][z].id = 1;
+            for(let y = 0; y <= height; y++){
+                if (y < h){
+                    setBlockId(x, y, z, 2);
+                }
+                else if (y == h){
+                    setBlockId(x, y, z, 1);
+                }
             }
         }
     }
@@ -188,113 +257,70 @@ function generateTerrain(){
 
 generateTerrain()
 
+function isInBounbs(x, y, z){
+    return (0 <= x && x < n) && (0 <= y && y < height) && (0 <= z && z < n);
+}
+
+function getBlock(x, y, z){
+    if(isInBounbs(x, y, z)){
+        return worldGrid[x][y][z];
+    }
+    return null;
+}
+
+function setBlockId(x, y, z, id){
+    if(isInBounbs(x, y, z)){
+        worldGrid[x][y][z].id = id;
+    }
+}
+
+function setBlockInstanceId(x, y, z, instanceId){
+    if(isInBounbs(x, y, z)){
+        worldGrid[x][y][z].instanceId = instanceId;
+    }
+}
+
 // Function to check if a cube is visible (not fully occluded)
 function isCubeVisible(x, y, z) {
-    if (visibilityGrid[x][y][z].id == 0) {
+    if (getBlock(x, y, z).id == 0) {
         return false
     }
     // Check if it's on the edge of the grid
     if (x === 0 || x === n*chunks - 1 || y === 0 || y === height - 1 || z === 0 || z === n*chunks - 1) {
         return true;
     }
-    // console.log(x,y,z, visibilityGrid)
+    // console.log(x,y,z, worldGrid)
     // Check if any neighboring cube is missing
-    return !visibilityGrid[x-1][y][z].id || !visibilityGrid[x+1][y][z].id ||
-           !visibilityGrid[x][y-1][z].id || !visibilityGrid[x][y+1][z].id ||
-           !visibilityGrid[x][y][z-1].id || !visibilityGrid[x][y][z+1].id;
+    return !worldGrid[x-1][y][z].id || !worldGrid[x+1][y][z].id ||
+           !worldGrid[x][y-1][z].id || !worldGrid[x][y+1][z].id ||
+           !worldGrid[x][y][z-1].id || !worldGrid[x][y][z+1].id;
 }
 
- let vertices = [0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
-                -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
-                 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
-                -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, 0.5,
-                -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5,
-                 0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5,
-                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5,
-                -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5,
-                 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
-                0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
-let indices = [0, 2, 1, 0, 3, 2,
-                4, 6, 5, 4, 7, 6,
-                8, 10, 9, 8, 11, 10, 
-                12, 14, 13, 12, 15, 14, 
-                16, 18, 17, 16, 19, 18, 
-                20, 22, 21, 20, 23, 22];
-let colors = [];
-
-console.log("Number of vertices:", vertices.length);
-console.log("Number of indices:", indices.length);
-
-// Create and store data into vertex buffer
-var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
-
-// Create and store data into index buffer
-var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
-
-/*=================== SHADERS =================== */
-
-var vertShader = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vertShader, document.getElementById("vertex-shader-3d").innerText);
-gl.compileShader(vertShader);
-
-var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fragShader, document.getElementById("fragment-shader-3d").innerText);
-gl.compileShader(fragShader);
-
-var shaderprogram = gl.createProgram();
-gl.attachShader(shaderprogram, vertShader);
-gl.attachShader(shaderprogram, fragShader);
-
-gl.linkProgram(shaderprogram);
-
-/*======== Associating attributes to vertex shader =====*/
-var _Pmatrix = gl.getUniformLocation(shaderprogram, "Pmatrix");
-var _Vmatrix = gl.getUniformLocation(shaderprogram, "Vmatrix");
-var _Mmatrix = gl.getAttribLocation(shaderprogram, "Mmatrix");
-
-gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-var _position = gl.getAttribLocation(shaderprogram, "position");
-gl.vertexAttribPointer(_position, 3, gl.FLOAT, false, 0, 0);
-gl.enableVertexAttribArray(_position);
-
-// setup matrices, one per instance
-const numInstances = n*height*n;
-// make a typed array with one view per matrix
-const matrixData = new Float32Array(numInstances * 16);
-
-const matrices = [];
-for (let i = 0; i < numInstances; ++i) {
-  matrices.push(new Float32Array(
-      matrixData.buffer,
-      i * 16 * 4,
-      16));
-}
-
-const matrixBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
-// just allocate the buffer
-gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
-
-let countInstances = 0;
-// update all the matrices
-for(let x = 0; x < n; x++){
-    console.log(x/n * 100)
-    for(let y = 0; y < height; y++){
-        for(let z = 0; z < n; z++){
-            if (isCubeVisible(x, y, z)) {
-                translation( x+0.5, y+0.5 , z+0.5, matrices[countInstances]);
-                colors = colors.concat(
-                    [0,0.1,0, 0,0.1,0, 0,0.1,0, 0,0.1,0],
-                    [0,1,0, 0,1,0, 0,1,0, 0,1,0],
-                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
-                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],
-                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
-                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],)
+function generateMesh(){
+    let countInstances = 0;
+    // let colors = []
+    // update all the matrices
+    for(let x = 0; x < n; x++){
+        console.log(x/n * 100)
+        for(let y = 0; y < height; y++){
+            for(let z = 0; z < n; z++){
+                if (isCubeVisible(x, y, z)) {
+                    setBlockInstanceId(x, y, z, countInstances)
+                    translation(x + 0.5, y + 0.5, z + 0.5, matrices[countInstances]);
+                    
+                    if (getBlock(x, y, z).id == 2) {
+                        colors.push(0.8, 0.2, 0, 1)
+                    } else if (getBlock(x, y, z).id == 1) {
+                        colors.push(0, 0.7, 0, 0.8)
+                    }
+                    countInstances++;
+                }
             }
-            countInstances++;
         }
     }
 }
+
+generateMesh()
 
 // upload the new matrix data
 gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
@@ -320,15 +346,14 @@ for (let i = 0; i < 4; ++i) {
     ext.vertexAttribDivisorANGLE(loc, 1);
 }
 
-
 // Create and store data into color buffer
 var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
-
 gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
+
 var _color = gl.getAttribLocation(shaderprogram, "color");
-gl.vertexAttribPointer(_color, 3, gl.FLOAT, false, 0, 0) ;
+gl.vertexAttribPointer(_color, 4, gl.FLOAT, false, 0, 0) ;
 gl.enableVertexAttribArray(_color);
-// ext.vertexAttribDivisorANGLE(_color, 0.25);
+ext.vertexAttribDivisorANGLE(_color, 1);
 
 gl.useProgram(shaderprogram);
 

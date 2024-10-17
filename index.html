@@ -30,8 +30,8 @@
             uniform mat4 Pmatrix;
             uniform mat4 Vmatrix;
             attribute mat4 Mmatrix;
-            attribute vec3 color;//the color of the point
-            varying vec3 vColor;
+            attribute vec4 color;//the color of the point
+            varying vec4 vColor;
             void main(void) { //pre-built function
                 gl_Position = Pmatrix*Vmatrix*Mmatrix*vec4(position, 1.);
                 vColor = color;
@@ -42,9 +42,9 @@
             // fragment shaders don't have a default precision so we need
             // to pick one. mediump is a good default
             precision mediump float;
-            varying vec3 vColor;
+            varying vec4 vColor;
             void main(void) {
-                gl_FragColor = vec4(vColor, 1.);
+                gl_FragColor = vColor;
             }
         </script>
 
