@@ -2,7 +2,12 @@
 var canvas = document.getElementById('canvas');
 gl = canvas.getContext('webgl');
 if (!gl) {
-   console.log("no webgl for you!")
+    console.alert("no webgl for you!")
+}
+
+const ext = gl.getExtension('ANGLE_instanced_arrays');
+if (!ext) {
+    console.alert('need ANGLE_instanced_arrays');
 }
 
 gl.getExtension("OES_element_index_uint");
@@ -161,23 +166,28 @@ const params = {
 let rng = new RNG(123);
 let perlinNoise = new PerlinNoise(rng);
 
-for(let x = 0; x < n; x++){
-    for(let z = 0; z < n; z++){
-        const value = perlinNoise.noise(
-            x / params.terrain.scale,
-            z / params.terrain.scale,
-            1
-        )
+function generateTerrain(){
+    for(let x = 0; x < n; x++){
+        for(let z = 0; z < n; z++){
+            const value = perlinNoise.noise(
+                x / params.terrain.scale,
+                z / params.terrain.scale,
+                1
+            )
 
-        const scalsedNoise = value * params.terrain.magnitude + params.terrain.offset
+            const scalsedNoise = value * params.terrain.magnitude + params.terrain.offset
 
-        const h = Math.max(0, Math.min(height - 1, Math.floor(scalsedNoise*height)))
+            const h = Math.max(0, Math.min(height - 1, Math.floor(scalsedNoise*height)))
 
-        for(let y = 0; y <= h; y++){
-            visibilityGrid[x][y][z].id = 1;
+            for(let y = 0; y <= h; y++){
+                visibilityGrid[x][y][z].id = 1;
+            }
         }
     }
 }
+
+generateTerrain()
+
 // Function to check if a cube is visible (not fully occluded)
 function isCubeVisible(x, y, z) {
     if (visibilityGrid[x][y][z].id == 0) {
@@ -194,41 +204,29 @@ function isCubeVisible(x, y, z) {
            !visibilityGrid[x][y][z-1].id || !visibilityGrid[x][y][z+1].id;
 }
 
-let vertices = [];
+ let vertices = [0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
+                -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
+                 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
+                -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, 0.5,
+                -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5,
+                 0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5,
+                 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5,
+                -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5,
+                 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
+                0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+let indices = [0, 2, 1, 0, 3, 2,
+                4, 6, 5, 4, 7, 6,
+                8, 10, 9, 8, 11, 10, 
+                12, 14, 13, 12, 15, 14, 
+                16, 18, 17, 16, 19, 18, 
+                20, 22, 21, 20, 23, 22];
 let colors = [];
-let indices = [];
-let k = 0;
-
-// for(let w = 0; w < chunks; w++){
-//     for(let l = 0; l < chunks; l++){
-        for(let x = 0; x < n; x++){
-            console.log((x)/(n) * 100)
-            for(let y = 0; y < height; y++){
-                for(let z = 0; z < n; z++){
-                    if (isCubeVisible(x, y, z)) {
-                        // console.log(x,y,zCoord)
-                        let cubeData = get_cube_data(x, y, z, 1);
-                        vertices = vertices.concat(cubeData.vertices);
-                        colors = colors.concat(cubeData.colors);
-                        indices = indices.concat(cubeData.indices.map(index => index + k));
-                        k += cubeData.vertices.length / 3;
-                    } else {
-                        // visibilityGrid[w * n + x][y][l * n + z] = false;
-                    }
-                }
-            }
-        }
-//     }
-// }
 
 console.log("Number of vertices:", vertices.length);
 console.log("Number of indices:", indices.length);
 
 // Create and store data into vertex buffer
 var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
-
-// Create and store data into color buffer
-var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
 
 // Create and store data into index buffer
 var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
@@ -252,22 +250,89 @@ gl.linkProgram(shaderprogram);
 /*======== Associating attributes to vertex shader =====*/
 var _Pmatrix = gl.getUniformLocation(shaderprogram, "Pmatrix");
 var _Vmatrix = gl.getUniformLocation(shaderprogram, "Vmatrix");
-var _Mmatrix = gl.getUniformLocation(shaderprogram, "Mmatrix");
+var _Mmatrix = gl.getAttribLocation(shaderprogram, "Mmatrix");
 
 gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
 var _position = gl.getAttribLocation(shaderprogram, "position");
-gl.vertexAttribPointer(_position, 3, gl.FLOAT, false,0,0);
+gl.vertexAttribPointer(_position, 3, gl.FLOAT, false, 0, 0);
 gl.enableVertexAttribArray(_position);
+
+// setup matrices, one per instance
+const numInstances = n*height*n;
+// make a typed array with one view per matrix
+const matrixData = new Float32Array(numInstances * 16);
+
+const matrices = [];
+for (let i = 0; i < numInstances; ++i) {
+  matrices.push(new Float32Array(
+      matrixData.buffer,
+      i * 16 * 4,
+      16));
+}
+
+const matrixBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+// just allocate the buffer
+gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
+
+let countInstances = 0;
+// update all the matrices
+for(let x = 0; x < n; x++){
+    console.log(x/n * 100)
+    for(let y = 0; y < height; y++){
+        for(let z = 0; z < n; z++){
+            if (isCubeVisible(x, y, z)) {
+                translation( x+0.5, y+0.5 , z+0.5, matrices[countInstances]);
+                colors = colors.concat(
+                    [0,0.1,0, 0,0.1,0, 0,0.1,0, 0,0.1,0],
+                    [0,1,0, 0,1,0, 0,1,0, 0,1,0],
+                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
+                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],
+                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
+                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],)
+            }
+            countInstances++;
+        }
+    }
+}
+
+// upload the new matrix data
+gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
+
+// set all 4 attributes for matrix
+const bytesPerMatrix = 4 * 16;
+for (let i = 0; i < 4; ++i) {
+    const loc = _Mmatrix + i ;
+    
+    gl.enableVertexAttribArray(loc);
+    // note the stride and offset
+    const offset = i * 16;  // 4 floats per row, 4 bytes per float
+    gl.vertexAttribPointer(
+        loc,              // location
+        4,                // size (num values to pull from buffer per iteration)
+        gl.FLOAT,         // type of data in buffer
+        false,            // normalize
+        bytesPerMatrix,   // stride, num bytes to advance to get to next set of values
+        offset,           // offset in buffer
+    );
+    // this line says this attribute only changes for each 1 instance
+    ext.vertexAttribDivisorANGLE(loc, 1);
+}
+
+
+// Create and store data into color buffer
+var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
 
 gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
 var _color = gl.getAttribLocation(shaderprogram, "color");
-gl.vertexAttribPointer(_color, 3, gl.FLOAT, false,0,0) ;
+gl.vertexAttribPointer(_color, 3, gl.FLOAT, false, 0, 0) ;
 gl.enableVertexAttribArray(_color);
+// ext.vertexAttribDivisorANGLE(_color, 0.25);
+
 gl.useProgram(shaderprogram);
 
 /*==================== MATRIX ====================== */
-
-var mo_matrix = [ 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 ];
 
 function get_projection(fov, a, zMin, zMax) {
    var ang = degToRad(fov)*.5 // Math.tan((fov*.5)*Math.PI/180); 
@@ -374,10 +439,10 @@ var animate = function(time) {
 
     gl.uniformMatrix4fv(_Pmatrix, false, proj_matrix);
     gl.uniformMatrix4fv(_Vmatrix, false, view_matrix);
-    gl.uniformMatrix4fv(_Mmatrix, false, mo_matrix);
+    // gl.uniformMatrix4fv(_Mmatrix, false, mo_matrix);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+    ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, numInstances);
 
     renderSum += performance.now() - renderTime
     frameCount++;
