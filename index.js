@@ -16,7 +16,7 @@ canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 let height = 32
-let n = 64;
+let n = 128;
 let chunks = 1;
 
 let vertices = [ 0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
@@ -114,6 +114,9 @@ var uLightColor = gl.getUniformLocation(shaderprogram, "uLightColor");
 var uLightPosition = gl.getUniformLocation(shaderprogram, "uLightPosition");
 var uViewPosition = gl.getUniformLocation(shaderprogram, 'uViewPosition');
 var uGammaCorrection = gl.getUniformLocation(shaderprogram, 'uGammaCorrection');
+
+var uFogColor = gl.getUniformLocation(shaderprogram, "uFogColor");
+var uFogDensity = gl.getUniformLocation(shaderprogram, "uFogDensity");
 
 // Create and store data into vertex buffer
 var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
@@ -254,9 +257,9 @@ for(let x = 0; x < n; x++){
 
 const params = {
     terrain: {
-        scale: 10,
+        scale: 40,
         offset : 0,
-        magnitude: 0.7
+        magnitude: 1
     },
 }
 
@@ -483,7 +486,8 @@ var obj = {
     // rotationSpeed: 0.02, // Speed of rotation
     zMax: 250,
     zMin: 0.25,
-    skyColor: [ 150, 220, 255 ] // RGB array
+    skyColor: [ 150, 220, 255 ], // RGB array
+    fog: 0.5,
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -508,6 +512,7 @@ gui.add(obj, 'speed').min(0.01).max(1).step(0.01);
 gui.add(obj, 'zMax').min(10).max(500).step(10); // Increment amount
 gui.add(obj, 'zMin').min(0.01).max(10).step(0.05); // Increment amount
 gui.addColor(obj, 'skyColor'); // Increment amount
+gui.add(obj, 'fog').min(0).max(1).step(0.01); // Increment amount
 
 // Sky color (sunrise to sunset)
 const skyColors = [
@@ -546,6 +551,10 @@ var animate = function() {
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    // set the fog color and amount
+    gl.uniform4fv(uFogColor, [color[0]/255, color[1]/255, color[2]/255, 1]);
+    gl.uniform1f(uFogDensity, Math.pow(2, 8*obj.fog - 9));
+    
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
     var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, yaw, pitch);
     cameraPositionFolder.updateDisplay()
@@ -569,7 +578,7 @@ var animate = function() {
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
     gl.uniform3fv(uLightPosition, [ n * time,
-                                    height * Math.sqrt(Math.max(Math.sin(time*Math.PI), 0)),
+                                    2 * height * Math.sqrt(Math.max(Math.sin(time*Math.PI), 0)),
                                     n * time]);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
