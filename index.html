@@ -36,20 +36,35 @@
 
             uniform vec3 uAmbientLight;
             uniform vec3 uLightColor;
-            uniform vec3 uLightDirection;
+            uniform vec3 uLightPosition;
+            uniform vec3 uViewPosition;   
+
+            attribute mat4 aNormalMatrix;
 
             varying vec4 vColor;
 
-            void main(void) { //pre-built function
-                gl_Position = uPmatrix*uVmatrix*aMmatrix*vec4(aPosition, 1.);
+            void main(void) { 
+                vec4 worldPosition = aMmatrix*vec4(aPosition, 1.);
 
-                vec3 normal = normalize(aNormal.xyz);
-                float nDotLight = max(dot(uLightDirection, normal), 0.0);
+                gl_Position = uPmatrix*uVmatrix*worldPosition;
+
+                vec3 normal = normalize(vec3(aNormalMatrix * vec4(aNormal, 0.0)));
+
+                vec3 lightDirection = normalize(uLightPosition - vec3(worldPosition));
+
+                float nDotLight = max(dot(lightDirection, normal), 0.0);
 
                 vec3 diffuse = uLightColor * nDotLight * aColor.rgb;
                 vec3 ambient = uAmbientLight * aColor.rgb;
+                
+                // Specular light
+                float specularStrength = 0.1;
+                vec3 viewDir = normalize(uViewPosition -  vec3(worldPosition));
+                vec3 reflectDir = reflect(-lightDirection, normal);
+                float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+                vec3 specular = specularStrength * spec * vec3(1.0, 1.0, 1.0);  // White specular light
 
-                vColor = vec4(diffuse + ambient, aColor.a);
+                vColor = vec4(diffuse + ambient + specular, aColor.a);
             }
         </script>
            
