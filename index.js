@@ -113,6 +113,7 @@ var uAmbientLight = gl.getUniformLocation(shaderprogram, "uAmbientLight");
 var uLightColor = gl.getUniformLocation(shaderprogram, "uLightColor");
 var uLightPosition = gl.getUniformLocation(shaderprogram, "uLightPosition");
 var uViewPosition = gl.getUniformLocation(shaderprogram, 'uViewPosition');
+var uGammaCorrection = gl.getUniformLocation(shaderprogram, 'uGammaCorrection');
 
 // Create and store data into vertex buffer
 var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
@@ -350,8 +351,9 @@ const normalMatrixBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, normalMatrixBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, normalMatrixData.byteLength, gl.DYNAMIC_DRAW);
 
+let countInstances = 0;
+
 function generateMesh(){
-    let countInstances = 0;
     // update all the matrices
     for(let x = 0; x < n; x++){
         console.log(x/n * 100)
@@ -362,9 +364,9 @@ function generateMesh(){
                     translation(x + 0.5, y + 0.5, z + 0.5, matrices[countInstances]);
 
                     if (getBlock(x, y, z).id == 2) {
-                        colors.push(0.6, 0.12, 0.01, 1)
+                        colors.push(1.0, 0.15, 0.045, 1)
                     } else if (getBlock(x, y, z).id == 1) {
-                        colors.push(0.2, 0.4, 0.2, 1)
+                        colors.push(0.4, 0.9, 0.3, 1)
                     }
 
                     // calculate normal the matrix
@@ -474,10 +476,10 @@ let renderSum = 0; // sum of render time for each frame
 var precentage = {precent: 0}
 var obj = {
     FPS: 0,
-    cameraPosition: {x: 0, y:1, z:1},
-    lightPosition: {x: Math.floor(n/2), y:height, z:Math.floor(n/2), ambient: 1},
+    cameraPosition: {x: 1, y:1, z:3},
+    lightPosition: {x: Math.floor(n/2), y:height, z:Math.floor(n/2), ambient: 0.3, gamma: 0.45},
     FOV: 60,
-    speed: 0.25,
+    speed: 0.5,
     // rotationSpeed: 0.02, // Speed of rotation
     zMax: 250,
     zMin: 0.25,
@@ -499,6 +501,7 @@ lightPositionFolder.add(obj.lightPosition, 'x').min(-64).max(64).step(1);
 lightPositionFolder.add(obj.lightPosition, 'y').min(-64).max(64).step(1);
 lightPositionFolder.add(obj.lightPosition, 'z').min(-64).max(64).step(1);
 lightPositionFolder.add(obj.lightPosition, 'ambient').min(0).max(2).step(0.01);
+lightPositionFolder.add(obj.lightPosition, 'gamma').min(0).max(2).step(0.01);
 lightPositionFolder.open()
 var FOV = gui.add(obj, 'FOV').min(10).max(120).step(5);
 gui.add(obj, 'speed').min(0.01).max(1).step(0.01);
@@ -506,14 +509,39 @@ gui.add(obj, 'zMax').min(10).max(500).step(10); // Increment amount
 gui.add(obj, 'zMin').min(0.01).max(10).step(0.05); // Increment amount
 gui.addColor(obj, 'skyColor'); // Increment amount
 
-var animate = function(time) {
+// Sky color (sunrise to sunset)
+const skyColors = [
+    { time: 0, color: [205, 204, 255] },      // Sunrise (yellow)
+    { time: 0.15, color: [150, 226, 255] }, // Day (blue)
+    { time: 0.85, color: [255, 165, 0] },   // Sunset (orange)
+    { time: 0.95, color: [200, 155, 250] }, // Sunset (pink)
+    { time: 1, color: [0, 0, 0] },          // Night (black)
+    { time: 1.1, color: [205, 204, 255] },
+];
+
+var time = 0;
+
+var animate = function() {
     let renderTime = performance.now();
+
+    time = (time + 0.001) % 1.1;
 
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
     // gl.depthFunc(gl.LEQUAL);
-        
-    gl.clearColor(obj.skyColor[0]/255, obj.skyColor[1]/255, obj.skyColor[2]/255, obj.skyColor[3]);
+    
+    var color = [0, 0, 0]
+    // Update sky color based on time
+    for (let i = 0; i < skyColors.length - 1; i++) {
+        const current = skyColors[i];
+        const next = skyColors[i + 1];
+        if (time >= current.time && time <= next.time) {
+          const factor = (time - current.time) / (next.time - current.time);
+          color = interpolateColor(current.color, next.color, factor);
+        }
+    }
+
+    gl.clearColor(color[0]/255, color[1]/255, color[2]/255, 1);
     // gl.clearDepth(1.0);
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -522,8 +550,8 @@ var animate = function(time) {
     var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, yaw, pitch);
     cameraPositionFolder.updateDisplay()
     var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.sin(yaw),
-                        cameraPositionArray[1] - Math.sin(pitch),
-                        cameraPositionArray[2] - Math.cos(pitch) * Math.cos(yaw)
+                    cameraPositionArray[1] - Math.sin(pitch),
+                    cameraPositionArray[2] - Math.cos(pitch) * Math.cos(yaw)
                     ];
 
     var up = [0, 1, 0];
@@ -537,15 +565,15 @@ var animate = function(time) {
     gl.uniform3fv(uViewPosition, [cameraPositionArray[0], cameraPositionArray[1], cameraPositionArray[2]]);  // Your camera position
     // console.log(view_matrix)
 
-    gl.uniform3f(uLightColor, obj.skyColor[0]/255, obj.skyColor[1]/255, obj.skyColor[2]/255);
+    gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
-    gl.uniform3fv(uLightPosition, [obj.lightPosition.x,
-                                                obj.lightPosition.y,
-                                                obj.lightPosition.z]);
-
+    gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
+    gl.uniform3fv(uLightPosition, [ n * time,
+                                    height * Math.sqrt(Math.max(Math.sin(time*Math.PI), 0)),
+                                    n * time]);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-    ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, numInstances);
+    ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
 
     renderSum += performance.now() - renderTime
     frameCount++;
