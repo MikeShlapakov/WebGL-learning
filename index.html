@@ -83,10 +83,11 @@
             varying vec3 vFogDepth;
 
             uniform vec4 uFogColor;
-            uniform float uFogDensity;
+            uniform float uFogNear;
+            uniform float uFogFar;
 
             void main(void) {
-                float fogAmount = 1. - exp2(-uFogDensity * uFogDensity * length(vFogDepth) * length(vFogDepth) * 1.442695);
+                float fogAmount = smoothstep(uFogNear, uFogFar, length(vFogDepth));
                 gl_FragColor = mix(vColor, uFogColor, fogAmount);  
             }
         </script>

@@ -116,7 +116,8 @@ var uViewPosition = gl.getUniformLocation(shaderprogram, 'uViewPosition');
 var uGammaCorrection = gl.getUniformLocation(shaderprogram, 'uGammaCorrection');
 
 var uFogColor = gl.getUniformLocation(shaderprogram, "uFogColor");
-var uFogDensity = gl.getUniformLocation(shaderprogram, "uFogDensity");
+var uFogNear = gl.getUniformLocation(shaderprogram, "uFogNear");
+var uFogFar = gl.getUniformLocation(shaderprogram, "uFogFar");
 
 // Create and store data into vertex buffer
 var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
@@ -487,7 +488,8 @@ var obj = {
     zMax: 250,
     zMin: 0.25,
     skyColor: [ 150, 220, 255 ], // RGB array
-    fog: 0.5,
+    fogNear: 0.4,
+    fogFar: 0.5,
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -512,7 +514,8 @@ gui.add(obj, 'speed').min(0.01).max(1).step(0.01);
 gui.add(obj, 'zMax').min(10).max(500).step(10); // Increment amount
 gui.add(obj, 'zMin').min(0.01).max(10).step(0.05); // Increment amount
 gui.addColor(obj, 'skyColor'); // Increment amount
-gui.add(obj, 'fog').min(0).max(1).step(0.01); // Increment amount
+gui.add(obj, 'fogNear').min(0).max(1).step(0.01); // Increment amount
+gui.add(obj, 'fogFar').min(0).max(1).step(0.01); // Increment amount
 
 // Sky color (sunrise to sunset)
 const skyColors = [
@@ -553,8 +556,9 @@ var animate = function() {
 
     // set the fog color and amount
     gl.uniform4fv(uFogColor, [color[0]/255, color[1]/255, color[2]/255, 1]);
-    gl.uniform1f(uFogDensity, Math.pow(2, 8*obj.fog - 9));
-    
+    gl.uniform1f(uFogNear, obj.fogNear * obj.zMax);
+    gl.uniform1f(uFogFar, obj.fogFar * obj.zMax);
+
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
     var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, yaw, pitch);
     cameraPositionFolder.updateDisplay()
