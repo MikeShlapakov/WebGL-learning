@@ -15,8 +15,8 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-let height = 32
-let n = 128;
+let height = 2
+let n = 2;
 let chunks = 1;
 
 let vertices = [ 0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
@@ -79,6 +79,7 @@ var normals = [
     0, 0, 1,
 ];
 
+let textureCoords = []
 let colors = [];
 
 console.log("Number of vertices:", vertices.length);
@@ -337,7 +338,6 @@ function isCubeVisible(x, y, z) {
 const numInstances = n*height*n;
 // make a typed array with one view per matrix
 const matrixData = new Float32Array(numInstances * 16);
-
 const matrices = [];
 for (let i = 0; i < numInstances; ++i) {
   matrices.push(new Float32Array(matrixData.buffer, i * 16 * 4, 16));
@@ -355,6 +355,16 @@ const normalMatrixBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, normalMatrixBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, normalMatrixData.byteLength, gl.DYNAMIC_DRAW);
 
+// // Set up texture coordinate buffer for instances
+// const textureInstanceData = new Float32Array(numInstances * 48);
+// const textureInstances = [];
+// for (let i = 0; i < numInstances; ++i) {
+//     textureInstances.push(new Float32Array(textureInstanceData.buffer, i * 48 * 4, 48));
+// }
+// const textureInstanceBuffer = gl.createBuffer();
+// gl.bindBuffer(gl.ARRAY_BUFFER, textureInstanceBuffer);
+// gl.bufferData(gl.ARRAY_BUFFER, textureInstanceData, gl.DYNAMIC_DRAW);
+
 let countInstances = 0;
 
 function generateMesh(){
@@ -366,13 +376,31 @@ function generateMesh(){
                 if (isCubeVisible(x, y, z)) {
                     setBlockInstanceId(x, y, z, countInstances)
                     translation(x + 0.5, y + 0.5, z + 0.5, matrices[countInstances]);
-
+                    // textureCoords = []
                     if (getBlock(x, y, z).id == 2) {
                         colors.push(1.0, 0.15, 0.045, 1)
+                        for (let i = 0; i < 6; i++) {
+                            textureCoords.push(...getTextureCoords(128, 64, 64, 64, 256, 128));
+                        }
                     } else if (getBlock(x, y, z).id == 1) {
                         colors.push(0.4, 0.9, 0.3, 1)
-                    }
+                        textureCoords.push(...getTextureCoords(128, 64, 64, 64, 256, 128));
 
+                        textureCoords.push(...getTextureCoords(0, 64, 64, 64, 256, 128));
+
+                        for (let i = 0; i < 4; i++) {
+                            textureCoords.push(...getTextureCoords(64, 64, 64, 64, 256, 128));
+                        }
+                    }
+                    // if (countInstances == 0) {
+                    //     colors.push(0.2, 0.2, 0.9, 1)
+                    // }
+                    // Copy coordinates to the texture array
+                    // for (let i = 0; i < textureCoords.length; i++) {
+                    //     textureInstances[countInstances][i] = textureCoords[i];
+                    // }
+                    // console.log(textureInstances[countInstances])
+                    // textureInstances[countInstances] = textureCoords;
                     // calculate normal the matrix
                     transpose(inverse(matrices[countInstances]), normalMatrices[countInstances])
 
@@ -415,14 +443,50 @@ var normalLocation = gl.getAttribLocation(shaderprogram, "aNormal");
 gl.vertexAttribPointer(normalLocation, 3, gl.FLOAT, false, 0, 0) ;
 gl.enableVertexAttribArray(normalLocation);
 
-// Create and store data into color buffer
-var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
-gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
+// // Create and store data into color buffer
+// var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
+// gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
 
-var _color = gl.getAttribLocation(shaderprogram, "aColor");
-gl.vertexAttribPointer(_color, 4, gl.FLOAT, false, 0, 0) ;
-gl.enableVertexAttribArray(_color);
-ext.vertexAttribDivisorANGLE(_color, 1);
+// var _color = gl.getAttribLocation(shaderprogram, "aColor");
+// gl.vertexAttribPointer(_color, 4, gl.FLOAT, false, 0, 0) ;
+// gl.enableVertexAttribArray(_color);
+// ext.vertexAttribDivisorANGLE(_color, 1);
+
+console.log(textureCoords)
+
+var uTexture = gl.getUniformLocation(shaderprogram, "uTexture");
+var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
+gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+
+// Upload the texture coordinate data
+// gl.bindBuffer(gl.ARRAY_BUFFER, textureInstanceBuffer);
+// gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureInstanceData);
+
+var aTexture = gl.getAttribLocation(shaderprogram, "aTextCoord");
+gl.enableVertexAttribArray(aTexture);
+gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 8, 0);
+// ext.vertexAttribDivisorANGLE(aTexture, 1);
+
+// Create a texture.
+var texture = gl.createTexture();
+gl.activeTexture(gl.TEXTURE0);
+gl.bindTexture(gl.TEXTURE_2D, texture);
+    
+// Fill the texture with a 1x1 blue pixel.
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([50, 200, 75, 255]));
+    
+// Asynchronously load an image
+var image = new Image();
+image.src = "./textures/GameTextures.png";
+image.addEventListener('load', function() {
+    // Now that the image has loaded make copy it to the texture.
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+});
 
 gl.useProgram(shaderprogram);
 
@@ -481,7 +545,7 @@ var precentage = {precent: 0}
 var obj = {
     FPS: 0,
     cameraPosition: {x: 1, y:1, z:3},
-    lightPosition: {x: Math.floor(n/2), y:height, z:Math.floor(n/2), ambient: 0.3, gamma: 0.45},
+    lightPosition: {x: Math.floor(n/2), y:height, z:Math.floor(n/2), ambient: 0.3, gamma: 1},
     FOV: 60,
     speed: 0.5,
     // rotationSpeed: 0.02, // Speed of rotation
@@ -584,6 +648,8 @@ var animate = function() {
     gl.uniform3fv(uLightPosition, [ n * time,
                                     2 * height * Math.sqrt(Math.max(Math.sin(time*Math.PI), 0)),
                                     n * time]);
+    
+    gl.uniform1i(uTexture, 0);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
     ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, countInstances);

@@ -3,8 +3,18 @@ function createBufferFromArray(arr, glArr=gl.ARRAY_BUFFER){
     gl.bindBuffer(glArr, buff);
     gl.bufferData(glArr, arr, gl.STATIC_DRAW);
     return buff
- }
- 
+}
+
+function getTextureCoords(tileX, tileY, tileWidth, tileHeight, atlasWidth, atlasHeight) {
+    // Normalized UVs based on the tile's position and the atlas size
+    return [
+        tileX / atlasWidth, (tileY + tileHeight) / atlasHeight,       // Bottom-left
+        (tileX + tileWidth) / atlasWidth, (tileY + tileHeight) / atlasHeight, // Bottom-right
+        (tileX + tileWidth) / atlasWidth, tileY / atlasHeight,       // Top-right
+        tileX / atlasWidth, tileY / atlasHeight,                     // Top-left
+    ];
+}
+
 function getRelativeMousePosition(event, target) {
     target = target || event.target;
 
@@ -20,54 +30,42 @@ function degToRad(d) {
     return d * Math.PI / 180;
 }
 
-// Normalize a vector
-function normalizeVector(vector) {
-    let length = Math.sqrt(vector[0]**2 + vector[1]**2 + vector[2]**2);
-    return [vector[0] / length, vector[1] / length, vector[2] / length];
-}
-
-// Normalize a vector
-function addVector(vector1, vector2) {
-    // let length = Math.sqrt(vector[0]**2 + vector[1]**2 + vector[2]**2);
-    return [vector1[0] + vector2[0], vector1[1] + vector2[1], vector1[2] + vector2[2]];
-}
-
 const keys = {}
 function calculateCameraPos(cameraPos, speed, yaw, pitch){
     let normal = [0,0,0];
     if (keys['a'])
-        normal = addVector(normal, normalizeVector([
+        normal = addVectors(normal, normalize([
                 -Math.cos(yaw),
                 0,
                 -Math.sin(yaw)
                 ]));
 
     if (keys['d']) // Move right
-        normal = addVector(normal, normalizeVector([
+        normal = addVectors(normal, normalize([
                 Math.cos(yaw),
                 0,
                 Math.sin(yaw)
             ]));
             
     if (keys['w']) // Move forward
-        normal = addVector(normal, normalizeVector([
+        normal = addVectors(normal, normalize([
                 Math.cos(pitch) * Math.sin(yaw),
                 0,
                 -Math.cos(pitch) * Math.cos(yaw)
             ]));
             
     if (keys['s']) // Move backward
-        normal = addVector(normal, normalizeVector([
+        normal = addVectors(normal, normalize([
                 -Math.cos(pitch) * Math.sin(yaw),
                 0,
                 Math.cos(pitch) * Math.cos(yaw)
             ]));
            
     if (keys[' ']) // Move up
-        normal = addVector(normal, normalizeVector([0,1,0]));
+        normal = addVectors(normal, normalize([0,1,0]));
             
     if (keys['Shift']) // Move down
-        normal = addVector(normal, normalizeVector([0,-1,0]));
+        normal = addVectors(normal, normalize([0,-1,0]));
     
     if (normal != [0,0,0]){
         // console.log( normal )
