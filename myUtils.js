@@ -5,13 +5,12 @@ function createBufferFromArray(arr, glArr=gl.ARRAY_BUFFER){
     return buff
 }
 
-function getTextureCoords(tileX, tileY, tileWidth, tileHeight, atlasWidth, atlasHeight) {
+function getTexturMatrix(offsetX, offsetY, width, height, atlasWidth, atlasHeight) {
     // Normalized UVs based on the tile's position and the atlas size
     return [
-        tileX / atlasWidth, (tileY + tileHeight) / atlasHeight,       // Bottom-left
-        (tileX + tileWidth) / atlasWidth, (tileY + tileHeight) / atlasHeight, // Bottom-right
-        (tileX + tileWidth) / atlasWidth, tileY / atlasHeight,       // Top-right
-        tileX / atlasWidth, tileY / atlasHeight,                     // Top-left
+        width / atlasWidth,   0,                    0,
+        0,                    height / atlasHeight, 0,
+        offsetX / atlasWidth, offsetY / atlasHeight, 1                   
     ];
 }
 

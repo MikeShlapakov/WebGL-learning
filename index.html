@@ -30,6 +30,7 @@
             attribute vec3 aNormal;
             attribute vec4 aColor;
             attribute vec2 aTextCoord;
+            attribute mat3 aTextureMatrix;
 
             uniform mat4 uPmatrix;
             uniform mat4 uVmatrix;
@@ -51,7 +52,7 @@
 
                 vNormal = vec3(aNormalMatrix * vec4(aNormal, 0.0));
 
-                vTextCoord = aTextCoord;
+                vTextCoord = (aTextureMatrix * vec3(aTextCoord, 1.)).xy;
 
                 vColor = aColor;
 
@@ -81,6 +82,7 @@
             varying vec3 vNormal;
             varying vec4 vColor;
             varying vec2 vTextCoord;
+
             varying vec3 vFogDepth;
 
             void main(void) {

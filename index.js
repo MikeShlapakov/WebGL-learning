@@ -15,8 +15,8 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-let height = 2
-let n = 2;
+let height = 16
+let n = 16;
 let chunks = 1;
 
 let vertices = [ 0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
@@ -79,7 +79,15 @@ var normals = [
     0, 0, 1,
 ];
 
-let textureCoords = []
+let textureCoords = [
+    1, 1, 0, 1, 0, 0, 1, 0, 
+    1, 1, 0, 1, 0, 0, 1, 0,
+    1, 1, 0, 1, 0, 0, 1, 0,
+    1, 1, 0, 1, 0, 0, 1, 0, 
+    1, 1, 0, 1, 0, 0, 1, 0,
+    1, 1, 0, 1, 0, 0, 1, 0, 
+]
+
 let colors = [];
 
 console.log("Number of vertices:", vertices.length);
@@ -109,6 +117,10 @@ var _Pmatrix = gl.getUniformLocation(shaderprogram, "uPmatrix");
 var _Vmatrix = gl.getUniformLocation(shaderprogram, "uVmatrix");
 var _Mmatrix = gl.getAttribLocation(shaderprogram, "aMmatrix");
 var aNormalMatrix = gl.getAttribLocation(shaderprogram, "aNormalMatrix");
+
+var aTexture = gl.getAttribLocation(shaderprogram, "aTextCoord");
+var aTextureMatrix = gl.getAttribLocation(shaderprogram, "aTextureMatrix");
+var uTexture = gl.getUniformLocation(shaderprogram, "uTexture");
 
 var uAmbientLight = gl.getUniformLocation(shaderprogram, "uAmbientLight");
 var uLightColor = gl.getUniformLocation(shaderprogram, "uLightColor");
@@ -259,7 +271,7 @@ for(let x = 0; x < n; x++){
 
 const params = {
     terrain: {
-        scale: 40,
+        scale: 20,
         offset : 0,
         magnitude: 1
     },
@@ -355,15 +367,14 @@ const normalMatrixBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, normalMatrixBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, normalMatrixData.byteLength, gl.DYNAMIC_DRAW);
 
-// // Set up texture coordinate buffer for instances
-// const textureInstanceData = new Float32Array(numInstances * 48);
-// const textureInstances = [];
-// for (let i = 0; i < numInstances; ++i) {
-//     textureInstances.push(new Float32Array(textureInstanceData.buffer, i * 48 * 4, 48));
-// }
-// const textureInstanceBuffer = gl.createBuffer();
-// gl.bindBuffer(gl.ARRAY_BUFFER, textureInstanceBuffer);
-// gl.bufferData(gl.ARRAY_BUFFER, textureInstanceData, gl.DYNAMIC_DRAW);
+const textureMatricesData = new Float32Array(numInstances * 9);
+const textureMatrices = [];
+for (let i = 0; i < numInstances; ++i) {
+    textureMatrices.push(new Float32Array(textureMatricesData.buffer, i * 9 * 4, 9));
+}
+const textureMatrixBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
 
@@ -380,17 +391,24 @@ function generateMesh(){
                     if (getBlock(x, y, z).id == 2) {
                         colors.push(1.0, 0.15, 0.045, 1)
                         for (let i = 0; i < 6; i++) {
-                            textureCoords.push(...getTextureCoords(128, 64, 64, 64, 256, 128));
+                            let m = getTexturMatrix(128, 64, 64, 64, 256, 128)
+                            for (let j = 0; j < 9; ++j) {
+                                textureMatrices[countInstances][i*9 + j] = m[j]
+                            }
                         }
                     } else if (getBlock(x, y, z).id == 1) {
                         colors.push(0.4, 0.9, 0.3, 1)
-                        textureCoords.push(...getTextureCoords(128, 64, 64, 64, 256, 128));
-
-                        textureCoords.push(...getTextureCoords(0, 64, 64, 64, 256, 128));
-
-                        for (let i = 0; i < 4; i++) {
-                            textureCoords.push(...getTextureCoords(64, 64, 64, 64, 256, 128));
+                        let m = getTexturMatrix(0, 64, 64, 64, 256, 128)
+                        for (let j = 0; j < 9; ++j) {
+                            textureMatrices[countInstances][j] = m[j]
                         }
+                        for (let i = 1; i < 6; i++) {
+                            let m = getTexturMatrix(0, 64, 64, 64, 256, 128)
+                            for (let j = 0; j < 9; ++j) {
+                                textureMatrices[countInstances][i*9 + j] = m[j]
+                            }
+                        }
+
                     }
                     // if (countInstances == 0) {
                     //     colors.push(0.2, 0.2, 0.9, 1)
@@ -452,19 +470,19 @@ gl.enableVertexAttribArray(normalLocation);
 // gl.enableVertexAttribArray(_color);
 // ext.vertexAttribDivisorANGLE(_color, 1);
 
-console.log(textureCoords)
+gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
+gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
+for (let i = 0; i < 3; ++i) {
+    gl.enableVertexAttribArray(aTextureMatrix + i);
+    gl.vertexAttribPointer(aTextureMatrix + i, 3, gl.FLOAT, false, 4*9, i*4*3);
+    ext.vertexAttribDivisorANGLE(aTextureMatrix + i, 1);
+}
 
-var uTexture = gl.getUniformLocation(shaderprogram, "uTexture");
 var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
 gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
 
-// Upload the texture coordinate data
-// gl.bindBuffer(gl.ARRAY_BUFFER, textureInstanceBuffer);
-// gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureInstanceData);
-
-var aTexture = gl.getAttribLocation(shaderprogram, "aTextCoord");
 gl.enableVertexAttribArray(aTexture);
-gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 8, 0);
+gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 0, 0);
 // ext.vertexAttribDivisorANGLE(aTexture, 1);
 
 // Create a texture.
@@ -602,7 +620,7 @@ var animate = function() {
     gl.enable(gl.DEPTH_TEST);
     // gl.depthFunc(gl.LEQUAL);
     
-    var color = [0, 0, 0]
+    var color = [150, 226, 255]
     // Update sky color based on time
     for (let i = 0; i < skyColors.length - 1; i++) {
         const current = skyColors[i];

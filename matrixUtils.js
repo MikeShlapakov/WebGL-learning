@@ -432,7 +432,7 @@ function orthographic(left, right, bottom, top, near, far, dst) {
  * @memberOf module:webgl-3d-math
  */
 function frustum(left, right, bottom, top, near, far, dst) {
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   var dx = right - left;
   var dy = top - bottom;
@@ -552,7 +552,7 @@ function translate(m, tx, ty, tz, dst) {
  * @memberOf module:webgl-3d-math
  */
 function xRotation(angleInRadians, dst) {
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
   var c = Math.cos(angleInRadians);
   var s = Math.sin(angleInRadians);
 
@@ -587,7 +587,7 @@ function xRotation(angleInRadians, dst) {
 function xRotate(m, angleInRadians, dst) {
   // this is the optimized version of
   // return multiply(m, xRotation(angleInRadians), dst);
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   var m10 = m[4];
   var m11 = m[5];
@@ -631,7 +631,7 @@ function xRotate(m, angleInRadians, dst) {
  * @memberOf module:webgl-3d-math
  */
 function yRotation(angleInRadians, dst) {
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
   var c = Math.cos(angleInRadians);
   var s = Math.sin(angleInRadians);
 
@@ -666,7 +666,7 @@ function yRotation(angleInRadians, dst) {
 function yRotate(m, angleInRadians, dst) {
   // this is the optimized version of
   // return multiply(m, yRotation(angleInRadians), dst);
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   var m00 = m[0 * 4 + 0];
   var m01 = m[0 * 4 + 1];
@@ -710,7 +710,7 @@ function yRotate(m, angleInRadians, dst) {
  * @memberOf module:webgl-3d-math
  */
 function zRotation(angleInRadians, dst) {
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
   var c = Math.cos(angleInRadians);
   var s = Math.sin(angleInRadians);
 
@@ -745,7 +745,7 @@ function zRotation(angleInRadians, dst) {
 function zRotate(m, angleInRadians, dst) {
   // This is the optimized version of
   // return multiply(m, zRotation(angleInRadians), dst);
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   var m00 = m[0 * 4 + 0];
   var m01 = m[0 * 4 + 1];
@@ -790,7 +790,7 @@ function zRotate(m, angleInRadians, dst) {
  * @memberOf module:webgl-3d-math
  */
 function axisRotation(axis, angleInRadians, dst) {
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   var x = axis[0];
   var y = axis[1];
@@ -838,7 +838,7 @@ function axisRotation(axis, angleInRadians, dst) {
 function axisRotate(m, axis, angleInRadians, dst) {
   // This is the optimized version of
   // return multiply(m, axisRotation(axis, angleInRadians), dst);
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   var x = axis[0];
   var y = axis[1];
@@ -909,7 +909,7 @@ function axisRotate(m, axis, angleInRadians, dst) {
  * @return {Matrix4} dst or a new matrix if none provided
  */
 function scaling(sx, sy, sz, dst) {
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   dst[ 0] = sx;
   dst[ 1] = 0;
@@ -944,7 +944,7 @@ function scaling(sx, sy, sz, dst) {
 function scale(m, sx, sy, sz, dst) {
   // This is the optimized version of
   // return multiply(m, scaling(sx, sy, sz), dst);
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   dst[ 0] = sx * m[0 * 4 + 0];
   dst[ 1] = sx * m[0 * 4 + 1];
@@ -978,7 +978,7 @@ function scale(m, sx, sy, sz, dst) {
  * @return {Matrix4} dst or a new matrix if none provided
  */
 function compose(translation, quaternion, scale, dst) {
-  dst = dst || new MatType(16);
+  dst = dst || new Array(16).fill(0);
 
   const x = quaternion[0];
   const y = quaternion[1];
