@@ -15,78 +15,53 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-let height = 16
-let n = 16;
+let height = 64
+let n = 64;
 let chunks = 1;
 
-let vertices = [ 0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
-                -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,
-                 0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
-                -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
-                -0.5, -0.5,  0.5, -0.5, -0.5, -0.5,
-                -0.5,  0.5, -0.5, -0.5,  0.5,  0.5,
-                 0.5, -0.5, -0.5,  0.5, -0.5,  0.5,
-                 0.5,  0.5,  0.5,  0.5,  0.5, -0.5,
-                -0.5, -0.5, -0.5,  0.5, -0.5, -0.5,
-                 0.5,  0.5, -0.5, -0.5,  0.5, -0.5,
-                 0.5, -0.5,  0.5, -0.5, -0.5,  0.5,
-                -0.5,  0.5,  0.5,  0.5,  0.5,  0.5
-]
+const textureSize = 32
+let atlasWidth = 192
+let atlasHeight = 128
 
-let indices = [ 0, 2, 1, 0, 3, 2,
-                4, 6, 5, 4, 7, 6,
-                8, 10, 9, 8, 11, 10, 
-                12, 14, 13, 12, 15, 14, 
-                16, 18, 17, 16, 19, 18, 
-                20, 22, 21, 20, 23, 22];
+
+let vertices = [ 
+    0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
+    -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,
+];
+
+let indices = [ 
+    0, 2, 1, 0, 3, 2,
+];
 
 var normals = [
-
     // bottom
-    0, -1, 0,
-    0, -1, 0,
-    0, -1, 0,
-    0, -1, 0,
-
+    [0, -1, 0],
     // top
-    0, 1, 0,
-    0, 1, 0,
-    0, 1, 0,
-    0, 1, 0,
-
+    [0, 1, 0],
     // left
-    -1, 0, 0,
-    -1, 0, 0,
-    -1, 0, 0,
-    -1, 0, 0,
-
+    [-1, 0, 0],
     // right
-    1, 0, 0,
-    1, 0, 0,
-    1, 0, 0,
-    1, 0, 0,
-    
+    [1, 0, 0],
     // back
-    0, 0, -1,
-    0, 0, -1,
-    0, 0, -1,
-    0, 0, -1,
-
+    [0, 0, -1],
     // front
-    0, 0, 1,
-    0, 0, 1,
-    0, 0, 1,
-    0, 0, 1,
+    [0, 0, 1]
 ];
 
 let textureCoords = [
-    1, 1, 0, 1, 0, 0, 1, 0, 
     1, 1, 0, 1, 0, 0, 1, 0,
-    1, 1, 0, 1, 0, 0, 1, 0,
-    1, 1, 0, 1, 0, 0, 1, 0, 
-    1, 1, 0, 1, 0, 0, 1, 0,
-    1, 1, 0, 1, 0, 0, 1, 0, 
 ]
+
+let textureOffsets = [[5,0], [0,0], [1,0], [2,0], [3,0], [4,0]]
+
+var faceMatrices = [
+    identity(),
+    xRotation(Math.PI),
+    yRotate(zRotation(Math.PI / -2), Math.PI / -2),
+    yRotate(zRotation(Math.PI / 2), Math.PI / 2),
+    yRotate(xRotation(Math.PI / 2), Math.PI ),
+    xRotation(Math.PI / -2),
+];
 
 let colors = [];
 
@@ -113,13 +88,17 @@ gl.attachShader(shaderprogram, fragShader);
 gl.linkProgram(shaderprogram);
 
 /*======== Associating attributes to vertex shader =====*/
-var _Pmatrix = gl.getUniformLocation(shaderprogram, "uPmatrix");
-var _Vmatrix = gl.getUniformLocation(shaderprogram, "uVmatrix");
-var _Mmatrix = gl.getAttribLocation(shaderprogram, "aMmatrix");
+var uPmatrix = gl.getUniformLocation(shaderprogram, "uPmatrix");
+var uVmatrix = gl.getUniformLocation(shaderprogram, "uVmatrix");
+var aMmatrix = gl.getAttribLocation(shaderprogram, "aMmatrix");
+var uFaceMatrix = gl.getUniformLocation(shaderprogram, "uFaceMatrix");
+
+var uNormal = gl.getUniformLocation(shaderprogram, "uNormal");
 var aNormalMatrix = gl.getAttribLocation(shaderprogram, "aNormalMatrix");
 
 var aTexture = gl.getAttribLocation(shaderprogram, "aTextCoord");
 var aTextureMatrix = gl.getAttribLocation(shaderprogram, "aTextureMatrix");
+var uTextureOffset = gl.getUniformLocation(shaderprogram, "uTextureOffset");
 var uTexture = gl.getUniformLocation(shaderprogram, "uTexture");
 
 var uAmbientLight = gl.getUniformLocation(shaderprogram, "uAmbientLight");
@@ -387,28 +366,17 @@ function generateMesh(){
                 if (isCubeVisible(x, y, z)) {
                     setBlockInstanceId(x, y, z, countInstances)
                     translation(x + 0.5, y + 0.5, z + 0.5, matrices[countInstances]);
-                    // textureCoords = []
+                    let m = []
                     if (getBlock(x, y, z).id == 2) {
                         colors.push(1.0, 0.15, 0.045, 1)
-                        for (let i = 0; i < 6; i++) {
-                            let m = getTexturMatrix(128, 64, 64, 64, 256, 128)
-                            for (let j = 0; j < 9; ++j) {
-                                textureMatrices[countInstances][i*9 + j] = m[j]
-                            }
-                        }
+                        m = getTexturMatrix(0, textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
+
                     } else if (getBlock(x, y, z).id == 1) {
                         colors.push(0.4, 0.9, 0.3, 1)
-                        let m = getTexturMatrix(0, 64, 64, 64, 256, 128)
-                        for (let j = 0; j < 9; ++j) {
-                            textureMatrices[countInstances][j] = m[j]
-                        }
-                        for (let i = 1; i < 6; i++) {
-                            let m = getTexturMatrix(0, 64, 64, 64, 256, 128)
-                            for (let j = 0; j < 9; ++j) {
-                                textureMatrices[countInstances][i*9 + j] = m[j]
-                            }
-                        }
-
+                        m = getTexturMatrix(0, 0, textureSize, textureSize, atlasWidth, atlasHeight)
+                    }
+                    for (let j = 0; j < 9; ++j) {
+                        textureMatrices[countInstances][j] = m[j]
                     }
                     // if (countInstances == 0) {
                     //     colors.push(0.2, 0.2, 0.9, 1)
@@ -436,9 +404,9 @@ gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
 gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
 
 for (let i = 0; i < 4; ++i) {
-    const loc = _Mmatrix + i ;
+    const loc = aMmatrix + i ;
     gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 64, i * 16);
+    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 4 * 16, i * 4 * 4);
     ext.vertexAttribDivisorANGLE(loc, 1);
 }
 
@@ -450,16 +418,9 @@ gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatrixData);
 for (let i = 0; i < 4; ++i) {
     const loc = aNormalMatrix + i;
     gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 64, i * 16);
+    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 4 * 16, i * 4 * 4);
     ext.vertexAttribDivisorANGLE(loc, 1);
 }
-
-var normals_buffer = createBufferFromArray(new Float32Array(normals), gl.ARRAY_BUFFER);
-gl.bindBuffer(gl.ARRAY_BUFFER, normals_buffer);
-
-var normalLocation = gl.getAttribLocation(shaderprogram, "aNormal");
-gl.vertexAttribPointer(normalLocation, 3, gl.FLOAT, false, 0, 0) ;
-gl.enableVertexAttribArray(normalLocation);
 
 // // Create and store data into color buffer
 // var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
@@ -473,9 +434,10 @@ gl.enableVertexAttribArray(normalLocation);
 gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
 gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
 for (let i = 0; i < 3; ++i) {
-    gl.enableVertexAttribArray(aTextureMatrix + i);
-    gl.vertexAttribPointer(aTextureMatrix + i, 3, gl.FLOAT, false, 4*9, i*4*3);
-    ext.vertexAttribDivisorANGLE(aTextureMatrix + i, 1);
+    const loc = aTextureMatrix + i;
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 4 * 9, i * 4 * 3);
+    ext.vertexAttribDivisorANGLE(loc, 1);
 }
 
 var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
@@ -497,13 +459,15 @@ gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new
 var image = new Image();
 image.src = "./textures/GameTextures.png";
 image.addEventListener('load', function() {
+    atlasWidth = image.width;
+    atlasHeight = image.height;
     // Now that the image has loaded make copy it to the texture.
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 });
 
 gl.useProgram(shaderprogram);
@@ -655,10 +619,9 @@ var animate = function() {
     // Make a view matrix from the camera matrix.
     var view_matrix = inverse(cameraMatrix);
 
-    gl.uniformMatrix4fv(_Pmatrix, false, proj_matrix);
-    gl.uniformMatrix4fv(_Vmatrix, false, view_matrix);
+    gl.uniformMatrix4fv(uPmatrix, false, proj_matrix);
+    gl.uniformMatrix4fv(uVmatrix, false, view_matrix);
     gl.uniform3fv(uViewPosition, [cameraPositionArray[0], cameraPositionArray[1], cameraPositionArray[2]]);  // Your camera position
-    // console.log(view_matrix)
 
     gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
@@ -670,14 +633,20 @@ var animate = function() {
     gl.uniform1i(uTexture, 0);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-    ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
+
+    faceMatrices.forEach(function(faceMatrix, ndx) {
+        gl.uniform2fv(uTextureOffset, new Float32Array(textureOffsets[ndx]));
+        gl.uniform3fv(uNormal, new Float32Array(normals[ndx]));
+        gl.uniformMatrix4fv(uFaceMatrix, false, faceMatrix);
+        ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
+    });
 
     renderSum += performance.now() - renderTime
     frameCount++;
 
     // Update FPS every second
     if (frameCount >= 100) {
-        FPS.setValue(Math.round((frameCount * 1000) / (renderSum)));
+        FPS.setValue(Math.round((frameCount * 100) / (renderSum)));
         frameCount = 0;
         renderSum = 0;
     }
