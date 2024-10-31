@@ -16,7 +16,7 @@ canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 let height = 64
-let n = 64;
+let n = 16;
 let chunks = 1;
 
 const textureSize = 32
@@ -68,56 +68,77 @@ let colors = [];
 console.log("Number of vertices:", vertices.length);
 console.log("Number of indices:", indices.length);
 
-// Create and store data into index buffer
-var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
+/*=================== Initialize Programs =================== */
 
-/*=================== SHADERS =================== */
+const mainProgram = createProgramFromSource(gl, {vertexShader:"vertex-shader-3d",
+                                                    fragmentShader:"fragment-shader-3d"})
 
-var vertShader = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vertShader, document.getElementById("vertex-shader-3d").innerText);
-gl.compileShader(vertShader);
-
-var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fragShader, document.getElementById("fragment-shader-3d").innerText);
-gl.compileShader(fragShader);
-
-var shaderprogram = gl.createProgram();
-gl.attachShader(shaderprogram, vertShader);
-gl.attachShader(shaderprogram, fragShader);
-
-gl.linkProgram(shaderprogram);
+const crosshairProgram = createProgramFromSource(gl, {vertexShader:"crosshair-vertex-shader",
+    fragmentShader:"crosshair-fragment-shader"})
 
 /*======== Associating attributes to vertex shader =====*/
-var uPmatrix = gl.getUniformLocation(shaderprogram, "uPmatrix");
-var uVmatrix = gl.getUniformLocation(shaderprogram, "uVmatrix");
-var aMmatrix = gl.getAttribLocation(shaderprogram, "aMmatrix");
-var uFaceMatrix = gl.getUniformLocation(shaderprogram, "uFaceMatrix");
+var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
+var uVmatrix = gl.getUniformLocation(mainProgram, "uVmatrix");
+var aMmatrix = gl.getAttribLocation(mainProgram, "aMmatrix");
+var uFaceMatrix = gl.getUniformLocation(mainProgram, "uFaceMatrix");
 
-var uNormal = gl.getUniformLocation(shaderprogram, "uNormal");
-var aNormalMatrix = gl.getAttribLocation(shaderprogram, "aNormalMatrix");
+var uNormal = gl.getUniformLocation(mainProgram, "uNormal");
+var aNormalMatrix = gl.getAttribLocation(mainProgram, "aNormalMatrix");
 
-var aTexture = gl.getAttribLocation(shaderprogram, "aTextCoord");
-var aTextureMatrix = gl.getAttribLocation(shaderprogram, "aTextureMatrix");
-var uTextureOffset = gl.getUniformLocation(shaderprogram, "uTextureOffset");
-var uTexture = gl.getUniformLocation(shaderprogram, "uTexture");
+var aTexture = gl.getAttribLocation(mainProgram, "aTextCoord");
+var aTextureMatrix = gl.getAttribLocation(mainProgram, "aTextureMatrix");
+var uTextureOffset = gl.getUniformLocation(mainProgram, "uTextureOffset");
+var uTexture = gl.getUniformLocation(mainProgram, "uTexture");
 
-var uAmbientLight = gl.getUniformLocation(shaderprogram, "uAmbientLight");
-var uLightColor = gl.getUniformLocation(shaderprogram, "uLightColor");
-var uLightPosition = gl.getUniformLocation(shaderprogram, "uLightPosition");
-var uViewPosition = gl.getUniformLocation(shaderprogram, 'uViewPosition');
-var uGammaCorrection = gl.getUniformLocation(shaderprogram, 'uGammaCorrection');
+var uAmbientLight = gl.getUniformLocation(mainProgram, "uAmbientLight");
+var uLightColor = gl.getUniformLocation(mainProgram, "uLightColor");
+var uLightPosition = gl.getUniformLocation(mainProgram, "uLightPosition");
+var uViewPosition = gl.getUniformLocation(mainProgram, 'uViewPosition');
+var uGammaCorrection = gl.getUniformLocation(mainProgram, 'uGammaCorrection');
 
-var uFogColor = gl.getUniformLocation(shaderprogram, "uFogColor");
-var uFogNear = gl.getUniformLocation(shaderprogram, "uFogNear");
-var uFogFar = gl.getUniformLocation(shaderprogram, "uFogFar");
+var uFogColor = gl.getUniformLocation(mainProgram, "uFogColor");
+var uFogNear = gl.getUniformLocation(mainProgram, "uFogNear");
+var uFogFar = gl.getUniformLocation(mainProgram, "uFogFar");
 
 // Create and store data into vertex buffer
 var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_BUFFER);
-gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
 
-var _position = gl.getAttribLocation(shaderprogram, "aPosition");
-gl.vertexAttribPointer(_position, 3, gl.FLOAT, false, 0, 0);
-gl.enableVertexAttribArray(_position);
+// Create and store data into index buffer
+var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
+
+/*======== Getting Crossahir attributes =====*/
+
+var crossahirPosition = gl.getAttribLocation(crosshairProgram, "a_position");
+var crossahirColor = gl.getAttribLocation(crosshairProgram, "a_color");
+
+// lookup uniforms
+var crossahirTransform = gl.getUniformLocation(crosshairProgram, "u_matrix");
+
+// Create a buffer to put positions in
+var positionBuffer = createBufferFromArray(new Float32Array([
+    0.5, 0,  0,
+    0, 0, 0,
+    
+    0, 0.5, 0,
+    0, 0, 0,
+
+    0, 0, 0.5,
+    0, 0, 0,
+]), gl.ARRAY_BUFFER);
+
+
+// Create a buffer to put colors in
+var colorBuffer = createBufferFromArray(new Uint8Array([
+    // left column front
+    250, 0,  0,
+    100, 0, 0,
+    
+    0, 250, 0,
+    0, 100, 0,
+
+    0, 0, 250,
+    0, 0, 100,
+]), gl.ARRAY_BUFFER);
 
 /*========== Defining and storing the geometry ==========*/
 
@@ -360,7 +381,7 @@ let countInstances = 0;
 function generateMesh(){
     // update all the matrices
     for(let x = 0; x < n; x++){
-        console.log(x/n * 100)
+        // console.log(x/n * 100)
         for(let y = 0; y < height; y++){
             for(let z = 0; z < n; z++){
                 if (isCubeVisible(x, y, z)) {
@@ -399,59 +420,11 @@ function generateMesh(){
 
 generateMesh()
 
-// upload the new matrix data
-gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
-gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
-
-for (let i = 0; i < 4; ++i) {
-    const loc = aMmatrix + i ;
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 4 * 16, i * 4 * 4);
-    ext.vertexAttribDivisorANGLE(loc, 1);
-}
-
-// Upload the normal matrix data
-gl.bindBuffer(gl.ARRAY_BUFFER, normalMatrixBuffer);
-gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatrixData);
-
-// Set up normal matrix attributes
-for (let i = 0; i < 4; ++i) {
-    const loc = aNormalMatrix + i;
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 4 * 16, i * 4 * 4);
-    ext.vertexAttribDivisorANGLE(loc, 1);
-}
-
-// // Create and store data into color buffer
-// var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
-// gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
-
-// var _color = gl.getAttribLocation(shaderprogram, "aColor");
-// gl.vertexAttribPointer(_color, 4, gl.FLOAT, false, 0, 0) ;
-// gl.enableVertexAttribArray(_color);
-// ext.vertexAttribDivisorANGLE(_color, 1);
-
-gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
-gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
-for (let i = 0; i < 3; ++i) {
-    const loc = aTextureMatrix + i;
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 4 * 9, i * 4 * 3);
-    ext.vertexAttribDivisorANGLE(loc, 1);
-}
-
-var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
-gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
-
-gl.enableVertexAttribArray(aTexture);
-gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 0, 0);
-// ext.vertexAttribDivisorANGLE(aTexture, 1);
-
 // Create a texture.
 var texture = gl.createTexture();
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, texture);
-    
+
 // Fill the texture with a 1x1 blue pixel.
 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([50, 200, 75, 255]));
     
@@ -470,15 +443,13 @@ image.addEventListener('load', function() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 });
 
-gl.useProgram(shaderprogram);
-
 /*==================== MATRIX ====================== */
 
 function get_projection(fov, a, zMin, zMax) {
-   var ang = degToRad(fov)*.5 // Math.tan((fov*.5)*Math.PI/180); 
+   var ang = degToRad(fov) // Math.tan((fov*.5)*Math.PI/180); 
    return [
-      0.5/ang, 0 , 0, 0,
-      0, 0.5*a/ang, 0, 0,
+      1/ang, 0 , 0, 0,
+      0, a/ang, 0, 0,
       0, 0, -(zMax+zMin)/(zMax-zMin), -1,
       0, 0, (-2*zMax*zMin)/(zMax-zMin), 0 
    ];
@@ -600,6 +571,44 @@ var animate = function() {
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    gl.useProgram(mainProgram);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+    
+    var aPosition = gl.getAttribLocation(mainProgram, "aPosition");
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(aPosition);
+
+        // upload the new matrix data
+    gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
+    setMatrixAttributes(gl, aMmatrix, 4, gl.FLOAT);
+
+    // Upload the normal matrix data
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalMatrixBuffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatrixData);
+    setMatrixAttributes(gl, aNormalMatrix, 4, gl.FLOAT);
+
+    // // Create and store data into color buffer
+    // var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
+    // gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
+
+    // var _color = gl.getAttribLocation(mainProgram, "aColor");
+    // gl.vertexAttribPointer(_color, 4, gl.FLOAT, false, 0, 0) ;
+    // gl.enableVertexAttribArray(_color);
+    // ext.vertexAttribDivisorANGLE(_color, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
+    setMatrixAttributes(gl, aTextureMatrix, 3, gl.FLOAT);
+
+    var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+
+    gl.enableVertexAttribArray(aTexture);
+    gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 0, 0);
+    // ext.vertexAttribDivisorANGLE(aTexture, 1);
+
     // set the fog color and amount
     gl.uniform4fv(uFogColor, [color[0]/255, color[1]/255, color[2]/255, 1]);
     gl.uniform1f(uFogNear, obj.fogNear * obj.zMax);
@@ -640,7 +649,7 @@ var animate = function() {
         gl.uniformMatrix4fv(uFaceMatrix, false, faceMatrix);
         ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
     });
-
+    
     renderSum += performance.now() - renderTime
     frameCount++;
 
@@ -651,6 +660,42 @@ var animate = function() {
         renderSum = 0;
     }
 
+    if (isDebugOn()){
+        drawCrosshair()
+        gui.open();
+    }
+    else{
+        gui.close();
+    }
+
     window.requestAnimationFrame(animate);
 }
 animate(0);
+
+function drawCrosshair(){
+    // gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(crosshairProgram);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.enableVertexAttribArray(crossahirPosition);
+    gl.vertexAttribPointer(crossahirPosition, 3, gl.FLOAT, false, 0, 0);
+
+    // Turn on the color attribute
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.enableVertexAttribArray(crossahirColor);
+    gl.vertexAttribPointer(crossahirColor, 3, gl.UNSIGNED_BYTE, true, 0, 0);
+
+    var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    var matrix = get_projection(80, aspect, 0, 1);
+    matrix = xRotate(matrix, -pitch);
+    matrix = yRotate(matrix, yaw);
+
+    // Set the matrix.
+    gl.uniformMatrix4fv(crossahirTransform, false, matrix);
+    
+    // Draw the geometry.
+    var primitiveType = gl.LINES;
+    var offset = 0;
+    var count = 6;
+    gl.drawArrays(primitiveType, offset, count);
+}
