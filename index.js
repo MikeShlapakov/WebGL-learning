@@ -108,36 +108,36 @@ var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_AR
 
 /*======== Getting Crossahir attributes =====*/
 
-var crossahirPosition = gl.getAttribLocation(crosshairProgram, "a_position");
-var crossahirColor = gl.getAttribLocation(crosshairProgram, "a_color");
+var crossahirPosition = gl.getAttribLocation(crosshairProgram, "aPosition");
+var crossahirColor = gl.getAttribLocation(crosshairProgram, "aColor");
 
 // lookup uniforms
-var crossahirTransform = gl.getUniformLocation(crosshairProgram, "u_matrix");
+var crossahirTransform = gl.getUniformLocation(crosshairProgram, "uMatrix");
 
 // Create a buffer to put positions in
 var positionBuffer = createBufferFromArray(new Float32Array([
-    0.5, 0,  0,
-    0, 0, 0,
-    
-    0, 0.5, 0,
+    0.45, 0,  0,
     0, 0, 0,
 
-    0, 0, 0.5,
+    0, 0, -0.45,
+    0, 0, 0,
+
+    0, 0.4, 0,
     0, 0, 0,
 ]), gl.ARRAY_BUFFER);
 
 
 // Create a buffer to put colors in
-var colorBuffer = createBufferFromArray(new Uint8Array([
+var colorBuffer = createBufferFromArray(new Uint8Array([  
     // left column front
     250, 0,  0,
     100, 0, 0,
-    
-    0, 250, 0,
-    0, 100, 0,
 
     0, 0, 250,
     0, 0, 100,
+
+    0, 250, 0,
+    0, 100, 0,
 ]), gl.ARRAY_BUFFER);
 
 /*========== Defining and storing the geometry ==========*/
@@ -673,7 +673,7 @@ var animate = function() {
 animate(0);
 
 function drawCrosshair(){
-    // gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.DEPTH_TEST);
     gl.useProgram(crosshairProgram);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -688,7 +688,7 @@ function drawCrosshair(){
     var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     var matrix = get_projection(80, aspect, 0, 1);
     matrix = xRotate(matrix, -pitch);
-    matrix = yRotate(matrix, yaw);
+    matrix = yRotate(matrix, -yaw);
 
     // Set the matrix.
     gl.uniformMatrix4fv(crossahirTransform, false, matrix);
