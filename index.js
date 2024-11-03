@@ -15,7 +15,7 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-let height = 64
+let height = 16
 let n = 16;
 let chunks = 1;
 
@@ -71,10 +71,13 @@ console.log("Number of indices:", indices.length);
 /*=================== Initialize Programs =================== */
 
 const mainProgram = createProgramFromSource(gl, {vertexShader:"vertex-shader-3d",
-                                                    fragmentShader:"fragment-shader-3d"})
+                                                fragmentShader:"fragment-shader-3d"})
+
+const pickerProgram = createProgramFromSource(gl, {vertexShader:"picker-vertex-shader",
+                                                fragmentShader:"picker-fragment-shader"})
 
 const crosshairProgram = createProgramFromSource(gl, {vertexShader:"crosshair-vertex-shader",
-    fragmentShader:"crosshair-fragment-shader"})
+                                                fragmentShader:"crosshair-fragment-shader"})
 
 /*======== Associating attributes to vertex shader =====*/
 var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
@@ -106,20 +109,59 @@ var vertex_buffer = createBufferFromArray(new Float32Array(vertices), gl.ARRAY_B
 // Create and store data into index buffer
 var index_buffer = createBufferFromArray(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
 
-/*======== Getting Crossahir attributes =====*/
+/*======== Setting Picker attributes =====*/
 
-var crossahirPosition = gl.getAttribLocation(crosshairProgram, "aPosition");
-var crossahirColor = gl.getAttribLocation(crosshairProgram, "aColor");
+var pickerPosition = gl.getAttribLocation(pickerProgram, "aPosition");
+var pickerColor = gl.getAttribLocation(pickerProgram, "aPickerColor");
+var pickeruPmatrix = gl.getUniformLocation(pickerProgram, "uPmatrix");
+var pickeruVmatrix = gl.getUniformLocation(pickerProgram, "uVmatrix");
+var pickeruMmatrix = gl.getUniformLocation(pickerProgram, "uMmatrix");
+var uAlphaColor = gl.getUniformLocation(pickerProgram, "uAlphaColor");
 
-// lookup uniforms
-var crossahirTransform = gl.getUniformLocation(crosshairProgram, "uMatrix");
+var pickerPositionBuffer = createBufferFromArray(new Float32Array([
+    0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
+    -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,
+     0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
+    -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
+    -0.5, -0.5,  0.5, -0.5, -0.5, -0.5,
+    -0.5,  0.5, -0.5, -0.5,  0.5,  0.5,
+     0.5, -0.5, -0.5,  0.5, -0.5,  0.5,
+     0.5,  0.5,  0.5,  0.5,  0.5, -0.5,
+    -0.5, -0.5, -0.5,  0.5, -0.5, -0.5,
+     0.5,  0.5, -0.5, -0.5,  0.5, -0.5,
+     0.5, -0.5,  0.5, -0.5, -0.5,  0.5,
+    -0.5,  0.5,  0.5,  0.5,  0.5,  0.5
+]), gl.ARRAY_BUFFER);
 
-// Create a buffer to put positions in
-var positionBuffer = createBufferFromArray(new Float32Array([
-    0.45, 0,  0,
+var pickerIndexbuffer = createBufferFromArray(new Uint32Array(
+    [ 0, 1, 2, 0, 2, 3,
+        4, 5, 6, 4, 6, 7,
+        8, 9, 10, 8, 10, 11, 
+        12, 13, 14, 12, 14, 15, 
+        16, 17, 18, 16, 18, 19, 
+        20, 21, 22, 20, 22, 23]
+), gl.ELEMENT_ARRAY_BUFFER);
+
+var pickerColorBuffer = createBufferFromArray(new Uint8Array([  
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 
+]), gl.ARRAY_BUFFER);
+
+/*======== Setting Crossahir attributes =====*/
+
+var crosshairPosition = gl.getAttribLocation(crosshairProgram, "aPosition");
+var crosshairColor = gl.getAttribLocation(crosshairProgram, "aColor");
+var crosshairTransform = gl.getUniformLocation(crosshairProgram, "uMatrix");
+
+var crosshairPositionBuffer = createBufferFromArray(new Float32Array([
+    0, 0, 0.45,
     0, 0, 0,
 
-    0, 0, -0.45,
+    0.45, 0,  0,
     0, 0, 0,
 
     0, 0.4, 0,
@@ -127,9 +169,7 @@ var positionBuffer = createBufferFromArray(new Float32Array([
 ]), gl.ARRAY_BUFFER);
 
 
-// Create a buffer to put colors in
-var colorBuffer = createBufferFromArray(new Uint8Array([  
-    // left column front
+var crosshairColorBuffer = createBufferFromArray(new Uint8Array([  
     250, 0,  0,
     100, 0, 0,
 
@@ -141,210 +181,6 @@ var colorBuffer = createBufferFromArray(new Uint8Array([
 ]), gl.ARRAY_BUFFER);
 
 /*========== Defining and storing the geometry ==========*/
-
-// Function to get vertices and determine visible faces for a cube
-function get_cube_data(x, y, z, size = 1) {
-    const half = size / 2;
-    let vertices = [];
-    let colors = [];
-    let indices = [];
-    let visibleFaces = [];
-
-    // Check each face
-    if (y === 0 || !worldGrid[x][y-1][z].id) {
-        visibleFaces.push('bottom');
-    }
-    if (y === height - 1 || !worldGrid[x][y+1][z].id) {
-        visibleFaces.push('top');
-    }
-    if (x === 0 || !worldGrid[x-1][y][z].id) {
-        visibleFaces.push('left');
-    }
-    if (x === n * chunks - 1 || !worldGrid[x+1][y][z].id) {
-        visibleFaces.push('right');
-    }
-    if (z === 0 || !worldGrid[x][y][z-1].id) {
-        visibleFaces.push('back');
-    }
-    if (z === n * chunks - 1 || !worldGrid[x][y][z+1].id) {
-        visibleFaces.push('front');
-    }
-
-    let vertexCount = 0;
-    visibleFaces.forEach(face => {
-        switch(face) {
-            case 'back':
-                vertices.push(
-                    x - half, y - half, z - half,
-                    x + half, y - half, z - half,
-                    x + half, y + half, z - half,
-                    x - half, y + half, z - half
-                );
-                colors = colors.concat(
-                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],
-                );
-                break;
-            case 'front':
-                vertices.push(
-                    x + half, y - half, z + half,
-                    x - half, y - half, z + half,
-                    x - half, y + half, z + half,
-                    x + half, y + half, z + half
-                );
-                colors = colors.concat(
-                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
-                );
-                break;
-            case 'left':
-                vertices.push(
-                    x - half, y - half, z + half,
-                    x - half, y - half, z - half,
-                    x - half, y + half, z - half,
-                    x - half, y + half, z + half
-                );
-                colors = colors.concat(
-                    [0,0.6,0, 0,0.6,0, 0,0.6,0, 0,0.6,0],
-                );
-                break;
-            case 'right':
-                vertices.push(
-                    x + half, y - half, z - half,
-                    x + half, y - half, z + half,
-                    x + half, y + half, z + half,
-                    x + half, y + half, z - half
-                );
-                colors = colors.concat(
-                    [0,0.3,0, 0,0.3,0, 0,0.3,0, 0,0.3,0],
-                );
-                break;
-            case 'bottom':
-                vertices.push(
-                    x + half, y - half, z - half,
-                    x - half, y - half, z - half,
-                    x - half, y - half, z + half,
-                    x + half, y - half, z + half
-                );
-                colors = colors.concat(
-                    [0,0,0, 0,0,0, 0,0,0, 0,0,0],
-                );
-                break;
-            case 'top':
-                vertices.push(
-                    x + half, y + half, z + half,
-                    x - half, y + half, z + half,
-                    x - half, y + half, z - half,
-                    x + half, y + half, z - half
-                );
-                colors = colors.concat(
-                    [0,1,0, 0,1,0, 0,1,0, 0,1,0],
-                );
-                break;
-        }
-        // colors = colors.concat([1,0,0, 0,1,0, 0,0,1, 0,1,1]);
-        // colors = colors.concat([x/(n*chunks),y/(height),z/(n*chunks), x/(n*chunks),y/(height),z/(n*chunks), x/(n*chunks),y/(height),z/(n*chunks), x/(n*chunks),y/(height),z/(n*chunks)]);
-        indices = indices.concat([
-            vertexCount, vertexCount + 2, vertexCount + 1,
-            vertexCount, vertexCount + 3, vertexCount + 2
-        ]);
-        vertexCount += 4;
-    });
-
-    return { vertices, colors, indices };
-}
-
-// 3D array to store cube visibility
-let worldGrid = []
-for(let x = 0; x < n; x++){
-    const slice = []
-    for(let y = 0; y < height; y++){
-        const row = []
-        for(let z = 0; z < n; z++){
-            row.push({
-                id : 0,
-                instanceId: null
-            })
-        }
-        slice.push(row)
-    }
-    worldGrid.push(slice)
-}
-
-const params = {
-    terrain: {
-        scale: 20,
-        offset : 0,
-        magnitude: 1
-    },
-}
-
-let rng = new RNG(123);
-let perlinNoise = new PerlinNoise(rng);
-
-function generateTerrain(){
-    for(let x = 0; x < n; x++){
-        for(let z = 0; z < n; z++){
-            const value = perlinNoise.noise(
-                x / params.terrain.scale,
-                z / params.terrain.scale,
-                1
-            )
-            const scalsedNoise = value * params.terrain.magnitude + params.terrain.offset
-
-            const h = Math.max(0, Math.min(height - 1, Math.floor(scalsedNoise*height)))
-
-            for(let y = 0; y <= height; y++){
-                if (y < h){
-                    setBlockId(x, y, z, 2);
-                }
-                else if (y == h){
-                    setBlockId(x, y, z, 1);
-                }
-            }
-        }
-    }
-}
-
-generateTerrain()
-
-function isInBounbs(x, y, z){
-    return (0 <= x && x < n) && (0 <= y && y < height) && (0 <= z && z < n);
-}
-
-function getBlock(x, y, z){
-    if(isInBounbs(x, y, z)){
-        return worldGrid[x][y][z];
-    }
-    return null;
-}
-
-function setBlockId(x, y, z, id){
-    if(isInBounbs(x, y, z)){
-        worldGrid[x][y][z].id = id;
-    }
-}
-
-function setBlockInstanceId(x, y, z, instanceId){
-    if(isInBounbs(x, y, z)){
-        worldGrid[x][y][z].instanceId = instanceId;
-    }
-}
-
-// Function to check if a cube is visible (not fully occluded)
-function isCubeVisible(x, y, z) {
-    if (getBlock(x, y, z).id == 0) {
-        return false
-    }
-    // Check if it's on the edge of the grid
-    if (x === 0 || x === n*chunks - 1 || y === 0 || y === height - 1 || z === 0 || z === n*chunks - 1) {
-        return true;
-    }
-    // console.log(x,y,z, worldGrid)
-    // Check if any neighboring cube is missing
-    return !worldGrid[x-1][y][z].id || !worldGrid[x+1][y][z].id ||
-           !worldGrid[x][y-1][z].id || !worldGrid[x][y+1][z].id ||
-           !worldGrid[x][y][z-1].id || !worldGrid[x][y][z+1].id;
-}
-
 
 // setup matrices, one per instance
 const numInstances = n*height*n;
@@ -378,21 +214,25 @@ gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
 
+const world = new World(n, height);
+world.generateTerrain();
+
 function generateMesh(){
+    countInstances = 0;
     // update all the matrices
     for(let x = 0; x < n; x++){
         // console.log(x/n * 100)
         for(let y = 0; y < height; y++){
             for(let z = 0; z < n; z++){
-                if (isCubeVisible(x, y, z)) {
-                    setBlockInstanceId(x, y, z, countInstances)
+                if (world.isCubeVisible(x, y, z)) {
+                    world.setBlockInstanceId(x, y, z, countInstances)
                     translation(x + 0.5, y + 0.5, z + 0.5, matrices[countInstances]);
                     let m = []
-                    if (getBlock(x, y, z).id == 2) {
+                    if (world.getBlock(x, y, z).id == 2) {
                         colors.push(1.0, 0.15, 0.045, 1)
                         m = getTexturMatrix(0, textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
 
-                    } else if (getBlock(x, y, z).id == 1) {
+                    } else if (world.getBlock(x, y, z).id == 1) {
                         colors.push(0.4, 0.9, 0.3, 1)
                         m = getTexturMatrix(0, 0, textureSize, textureSize, atlasWidth, atlasHeight)
                     }
@@ -483,10 +323,23 @@ document.addEventListener("wheel", e => {
    FOV.updateDisplay()
 }, { passive: false });
 
+let breakBlock = false;
+let placeBlock = false;
+// function breakBlock(){
+//     console.log("break");
+// }
 
 // canvas.addEventListener("mousedown", mouseDown, false);
 // canvas.addEventListener("mouseup", mouseUp, false);
-document.addEventListener("click", e => {canvas.requestPointerLock();});
+document.addEventListener("mouseup", e => {canvas.requestPointerLock();
+    // console.log(e.button);
+    if (e.button == 0){
+        breakBlock = true;
+    }
+    else if (e.button == 2){
+        placeBlock = true;
+    }
+});
 document.addEventListener("mouseout", e => {document.exitPointerLock();});
 
 /*=================== Drawing =================== */
@@ -549,7 +402,7 @@ var time = 0;
 var animate = function() {
     let renderTime = performance.now();
 
-    time = (time + 0.001) % 1.1;
+    time = (time + 0.001);
 
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
@@ -560,8 +413,8 @@ var animate = function() {
     for (let i = 0; i < skyColors.length - 1; i++) {
         const current = skyColors[i];
         const next = skyColors[i + 1];
-        if (time >= current.time && time <= next.time) {
-          const factor = (time - current.time) / (next.time - current.time);
+        if (time % 1.1 >= current.time && time % 1.1 <= next.time) {
+          const factor = (time % 1.1 - current.time) / (next.time - current.time);
           color = interpolateColor(current.color, next.color, factor);
         }
     }
@@ -617,9 +470,9 @@ var animate = function() {
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
     var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, yaw, pitch);
     cameraPositionFolder.updateDisplay()
-    var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.sin(yaw),
+    var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.cos(yaw),
                     cameraPositionArray[1] - Math.sin(pitch),
-                    cameraPositionArray[2] - Math.cos(pitch) * Math.cos(yaw)
+                    cameraPositionArray[2] - Math.cos(pitch) * Math.sin(-yaw)
                     ];
 
     var up = [0, 1, 0];
@@ -635,9 +488,9 @@ var animate = function() {
     gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
-    gl.uniform3fv(uLightPosition, [ n * time,
-                                    2 * height * Math.sqrt(Math.max(Math.sin(time*Math.PI), 0)),
-                                    n * time]);
+    gl.uniform3fv(uLightPosition, [ n * time % 1.1,
+                                    2 * height * Math.sqrt(Math.max(Math.sin(time % 1.1*Math.PI), 0)),
+                                    n * time % 1.1]);
     
     gl.uniform1i(uTexture, 0);
 
@@ -660,6 +513,36 @@ var animate = function() {
         renderSum = 0;
     }
 
+    let ray = castARay(world, 
+        {
+            x: obj.cameraPosition.x,
+            y: obj.cameraPosition.y,
+            z: obj.cameraPosition.z
+            }, 
+        {
+            x: Math.cos(pitch) * Math.cos(yaw),
+            y: -Math.sin(pitch),
+            z: -Math.cos(pitch) * Math.sin(-yaw)
+        }, 5)
+    
+    if(ray.hit){
+        // console.log(ray.normal);
+        drawPicker(time, ray.position, proj_matrix, view_matrix)
+        if(breakBlock){
+            world.setBlockId(ray.position.x,ray.position.y, ray.position.z, 0);
+            world.setBlockInstanceId(ray.position.x,ray.position.y, ray.position.z, null);
+            breakBlock = false;
+            generateMesh()
+        }
+        if(placeBlock){
+            world.setBlockId(ray.position.x + ray.normal.x,
+                ray.position.y + ray.normal.y, 
+                ray.position.z + ray.normal.z, 2);
+            placeBlock = false;
+            generateMesh()
+        }
+    }
+
     if (isDebugOn()){
         drawCrosshair()
         gui.open();
@@ -672,30 +555,55 @@ var animate = function() {
 }
 animate(0);
 
+function drawPicker(time, pos, Pmatrix, Vmatrix){
+    gl.disable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    gl.useProgram(pickerProgram);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, pickerPositionBuffer);
+    gl.enableVertexAttribArray(pickerPosition);
+    gl.vertexAttribPointer(pickerPosition, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, pickerColorBuffer);
+    gl.enableVertexAttribArray(pickerColor);
+    gl.vertexAttribPointer(pickerColor, 3, gl.UNSIGNED_BYTE, true, 0, 0);
+
+    var matrix = translate([1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,0,1
+    ], pos.x + 0.5, pos.y+ 0.5, pos.z+ 0.5)
+
+    gl.uniformMatrix4fv(pickeruPmatrix, false, Pmatrix);
+    gl.uniformMatrix4fv(pickeruVmatrix, false, Vmatrix);
+    gl.uniformMatrix4fv(pickeruMmatrix, false, matrix);
+    gl.uniform1f(uAlphaColor, Math.sin(time*64) / 4 + 0.7);
+    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pickerIndexbuffer);
+
+    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, 0);
+}
+
 function drawCrosshair(){
     gl.disable(gl.DEPTH_TEST);
     gl.useProgram(crosshairProgram);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.enableVertexAttribArray(crossahirPosition);
-    gl.vertexAttribPointer(crossahirPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, crosshairPositionBuffer);
+    gl.enableVertexAttribArray(crosshairPosition);
+    gl.vertexAttribPointer(crosshairPosition, 3, gl.FLOAT, false, 0, 0);
 
-    // Turn on the color attribute
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.enableVertexAttribArray(crossahirColor);
-    gl.vertexAttribPointer(crossahirColor, 3, gl.UNSIGNED_BYTE, true, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, crosshairColorBuffer);
+    gl.enableVertexAttribArray(crosshairColor);
+    gl.vertexAttribPointer(crosshairColor, 3, gl.UNSIGNED_BYTE, true, 0, 0);
 
     var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     var matrix = get_projection(80, aspect, 0, 1);
     matrix = xRotate(matrix, -pitch);
     matrix = yRotate(matrix, -yaw);
 
-    // Set the matrix.
-    gl.uniformMatrix4fv(crossahirTransform, false, matrix);
-    
-    // Draw the geometry.
-    var primitiveType = gl.LINES;
-    var offset = 0;
-    var count = 6;
-    gl.drawArrays(primitiveType, offset, count);
+    gl.uniformMatrix4fv(crosshairTransform, false, matrix);
+
+    gl.drawArrays(gl.LINES, 0, 6);
 }

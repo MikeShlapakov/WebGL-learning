@@ -97,28 +97,28 @@ function isDebugOn(){
 
 function calculateCameraPos(cameraPos, speed, yaw, pitch){
     let normal = [0,0,0];
-    if (keys['a'])
+    if (keys['w']) // Move forward
+    normal = addVectors(normal, normalize([
+            Math.cos(yaw),
+            0,
+            Math.sin(yaw)
+        ]));
+
+    if (keys['s'])  // Move backward
         normal = addVectors(normal, normalize([
                 -Math.cos(yaw),
                 0,
                 -Math.sin(yaw)
                 ]));
-
-    if (keys['d']) // Move right
-        normal = addVectors(normal, normalize([
-                Math.cos(yaw),
-                0,
-                Math.sin(yaw)
-            ]));
             
-    if (keys['w']) // Move forward
+    if (keys['a']) // Move left
         normal = addVectors(normal, normalize([
                 Math.cos(pitch) * Math.sin(yaw),
                 0,
                 -Math.cos(pitch) * Math.cos(yaw)
             ]));
             
-    if (keys['s']) // Move backward
+    if (keys['d']) // Move right
         normal = addVectors(normal, normalize([
                 -Math.cos(pitch) * Math.sin(yaw),
                 0,
@@ -236,4 +236,163 @@ class RNG {
         result /= 4294967296;
         return result;
     }
+}
+
+class World {
+    constructor(width, height, seed = 123, terrain = {scale: 20,offset: 0,magnitude: 1}) {
+        this.width = width;
+        this.height = height;
+        this.worldGrid = [];
+        this.terrain = terrain;
+        
+        this.rng = new RNG(seed);
+        this.perlinNoise = new PerlinNoise(this.rng);
+
+        this.initializeGrid();
+    }
+
+    initializeGrid() {
+        for (let x = 0; x < this.width; x++) {
+            const slice = [];
+            for (let y = 0; y < this.height; y++) {
+                const row = [];
+                for (let z = 0; z < this.width; z++) {
+                    row.push({
+                        id: 0,
+                        instanceId: null,
+                    });
+                }
+                slice.push(row);
+            }
+            this.worldGrid.push(slice);
+        }
+    }
+
+    isInBounds(x, y, z) {
+        return (0 <= x && x < this.width) && (0 <= y && y < this.height) && (0 <= z && z < this.width);
+    }
+
+    getBlock(x, y, z) {
+        if (this.isInBounds(x, y, z)) {
+            return this.worldGrid[x][y][z];
+        }
+        return null;
+    }
+
+    setBlockId(x, y, z, id) {
+        if (this.isInBounds(x, y, z)) {
+            this.worldGrid[x][y][z].id = id;
+        }
+    }
+
+    setBlockInstanceId(x, y, z, instanceId) {
+        if (this.isInBounds(x, y, z)) {
+            this.worldGrid[x][y][z].instanceId = instanceId;
+        }
+    }
+
+    generateTerrain() {
+        for (let x = 0; x < this.width; x++) {
+            for (let z = 0; z < this.width; z++) {
+                const value = this.perlinNoise.noise(
+                    x / this.terrain.scale,
+                    z / this.terrain.scale,
+                    1
+                );
+                const scaledNoise = value * this.terrain.magnitude + this.terrain.offset;
+                const h = Math.max(0, Math.min(this.height - 1, Math.floor(scaledNoise * this.height)));
+
+                for (let y = 0; y <= this.height; y++) {
+                    if (y < h) {
+                        this.setBlockId(x, y, z, 2); // Interior block
+                    } else if (y === h) {
+                        this.setBlockId(x, y, z, 1); // Surface block
+                    }
+                }
+            }
+        }
+    }
+
+    isCubeVisible(x, y, z) {
+        const block = this.getBlock(x, y, z);
+        if (!block || block.id === 0) {
+            return false;
+        }
+
+        // Check if it's on the edge of the grid
+        if (x === 0 || x === this.width - 1 || y === 0 || y === this.height - 1 || z === 0 || z === this.width - 1) {
+            return true;
+        }
+
+        // Check if any neighboring cube is missing
+        return !this.worldGrid[x - 1][y][z].id || !this.worldGrid[x + 1][y][z].id ||
+               !this.worldGrid[x][y - 1][z].id || !this.worldGrid[x][y + 1][z].id ||
+               !this.worldGrid[x][y][z - 1].id || !this.worldGrid[x][y][z + 1].id;
+    }
+}
+
+function castARay(world, cameraPos, cameraDirection, maxDistance){
+    const blockPos = {
+        x: Math.floor(cameraPos.x),
+        y: Math.floor(cameraPos.y),
+        z: Math.floor(cameraPos.z)
+    }
+
+    const step = {
+        x: cameraDirection.x > 0 ? 1: -1,
+        y: cameraDirection.y > 0 ? 1: -1,
+        z: cameraDirection.z > 0 ? 1: -1
+    };
+
+    const deltaSteps = {
+        x: Math.abs(1 / cameraDirection.x),
+        y: Math.abs(1 / cameraDirection.y),
+        z: Math.abs(1 / cameraDirection.z)
+    };
+
+    const tMax = {
+        x: step.x > 0 ? (blockPos.x+1 - cameraPos.x) * deltaSteps.x : 
+            (cameraPos.x - blockPos.x) * deltaSteps.x,
+        y: step.y > 0 ? (blockPos.y+1 - cameraPos.y) * deltaSteps.y :
+            (cameraPos.y - blockPos.y) * deltaSteps.y,
+        z: step.z > 0 ? (blockPos.z+1 - cameraPos.z) * deltaSteps.z :
+            (cameraPos.z - blockPos.z) * deltaSteps.z
+    };
+
+    let totalDistance = 0;
+    while (totalDistance < maxDistance) {
+        let normal = {x:0, y:0, z:0};
+
+        if (tMax.x < tMax.y && tMax.x < tMax.z) {
+            blockPos.x += step.x;
+            totalDistance = tMax.x;
+            tMax.x += deltaSteps.x;
+            normal.x = step.x > 0 ? -1: 1
+        } else if (tMax.y < tMax.z) {
+            blockPos.y += step.y;
+            totalDistance = tMax.y;
+            tMax.y += deltaSteps.y;
+            normal.y = step.y > 0 ? -1: 1
+        } else {
+            blockPos.z += step.z;
+            totalDistance = tMax.z;
+            tMax.z += deltaSteps.z;
+            normal.z = step.z > 0 ? -1: 1
+        }
+
+        const block = world.getBlock(blockPos.x, blockPos.y, blockPos.z);
+        if (block) {
+            if (block.id != 0){
+                return {
+                    position: blockPos,
+                    normal: normal,
+                    hit: true
+                };
+            }
+        }
+    }
+
+    return {
+        hit: false,
+    };
 }
