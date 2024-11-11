@@ -15,9 +15,9 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-let height = 16
-let n = 16;
-let chunks = 1;
+let chunkWidth = 16;
+let chunkHeight = 16;
+let chunksNum = 4;
 
 const textureSize = 32
 let atlasWidth = 192
@@ -143,12 +143,12 @@ var pickerIndexbuffer = createBufferFromArray(new Uint32Array(
 ), gl.ELEMENT_ARRAY_BUFFER);
 
 var pickerColorBuffer = createBufferFromArray(new Uint8Array([  
-    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
-    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
-    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
-    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
-    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,  
-    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 
 ]), gl.ARRAY_BUFFER);
 
 /*======== Setting Crossahir attributes =====*/
@@ -183,7 +183,7 @@ var crosshairColorBuffer = createBufferFromArray(new Uint8Array([
 /*========== Defining and storing the geometry ==========*/
 
 // setup matrices, one per instance
-const numInstances = n*height*n;
+const numInstances = chunkWidth*chunksNum*chunkHeight*chunkWidth*chunksNum;
 // make a typed array with one view per matrix
 const matrixData = new Float32Array(numInstances * 16);
 const matrices = [];
@@ -213,52 +213,11 @@ gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
+let mat = []
+const world = new World({width:chunkWidth, height:chunkHeight}, chunksNum, {positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances);
+mat,countInstances = world.generateChunks();
 
-const world = new World(n, height);
-world.generateTerrain();
-
-function generateMesh(){
-    countInstances = 0;
-    // update all the matrices
-    for(let x = 0; x < n; x++){
-        // console.log(x/n * 100)
-        for(let y = 0; y < height; y++){
-            for(let z = 0; z < n; z++){
-                if (world.isCubeVisible(x, y, z)) {
-                    world.setBlockInstanceId(x, y, z, countInstances)
-                    translation(x + 0.5, y + 0.5, z + 0.5, matrices[countInstances]);
-                    let m = []
-                    if (world.getBlock(x, y, z).id == 2) {
-                        colors.push(1.0, 0.15, 0.045, 1)
-                        m = getTexturMatrix(0, textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
-
-                    } else if (world.getBlock(x, y, z).id == 1) {
-                        colors.push(0.4, 0.9, 0.3, 1)
-                        m = getTexturMatrix(0, 0, textureSize, textureSize, atlasWidth, atlasHeight)
-                    }
-                    for (let j = 0; j < 9; ++j) {
-                        textureMatrices[countInstances][j] = m[j]
-                    }
-                    // if (countInstances == 0) {
-                    //     colors.push(0.2, 0.2, 0.9, 1)
-                    // }
-                    // Copy coordinates to the texture array
-                    // for (let i = 0; i < textureCoords.length; i++) {
-                    //     textureInstances[countInstances][i] = textureCoords[i];
-                    // }
-                    // console.log(textureInstances[countInstances])
-                    // textureInstances[countInstances] = textureCoords;
-                    // calculate normal the matrix
-                    transpose(inverse(matrices[countInstances]), normalMatrices[countInstances])
-
-                    countInstances++;
-                }
-            }
-        }
-    }
-}
-
-generateMesh()
+console.log("Number of instances:", countInstances)
 
 // Create a texture.
 var texture = gl.createTexture();
@@ -323,21 +282,19 @@ document.addEventListener("wheel", e => {
    FOV.updateDisplay()
 }, { passive: false });
 
+let blockSelected = false;
 let breakBlock = false;
 let placeBlock = false;
-// function breakBlock(){
-//     console.log("break");
-// }
 
-// canvas.addEventListener("mousedown", mouseDown, false);
-// canvas.addEventListener("mouseup", mouseUp, false);
 document.addEventListener("mouseup", e => {canvas.requestPointerLock();
     // console.log(e.button);
-    if (e.button == 0){
-        breakBlock = true;
-    }
-    else if (e.button == 2){
-        placeBlock = true;
+    if (blockSelected){
+        if (e.button == 0){
+            breakBlock = true;
+        }
+        else if (e.button == 2){
+            placeBlock = true;
+        }
     }
 });
 document.addEventListener("mouseout", e => {document.exitPointerLock();});
@@ -351,15 +308,15 @@ var precentage = {precent: 0}
 var obj = {
     FPS: 0,
     cameraPosition: {x: 1, y:1, z:3},
-    lightPosition: {x: Math.floor(n/2), y:height, z:Math.floor(n/2), ambient: 0.3, gamma: 1},
+    lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), ambient: 0.3, gamma: 1},
     FOV: 60,
     speed: 0.5,
     // rotationSpeed: 0.02, // Speed of rotation
-    zMax: 250,
+    zMax: chunkWidth*chunksNum,
     zMin: 0.25,
     skyColor: [ 150, 220, 255 ], // RGB array
-    fogNear: 0.4,
-    fogFar: 0.5,
+    fogNear: 0.75,
+    fogFar: 1.0,
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -373,9 +330,9 @@ cameraPositionFolder.add(obj.cameraPosition, 'y')
 cameraPositionFolder.add(obj.cameraPosition, 'z')
 cameraPositionFolder.open()
 var lightPositionFolder = gui.addFolder('Light Position')
-lightPositionFolder.add(obj.lightPosition, 'x').min(-64).max(64).step(1);
-lightPositionFolder.add(obj.lightPosition, 'y').min(-64).max(64).step(1);
-lightPositionFolder.add(obj.lightPosition, 'z').min(-64).max(64).step(1);
+lightPositionFolder.add(obj.lightPosition, 'x').min(-chunkWidth*chunksNum).max(chunkWidth*chunksNum).step(1);
+lightPositionFolder.add(obj.lightPosition, 'y').min(-chunkWidth*chunksNum).max(chunkWidth*chunksNum).step(1);
+lightPositionFolder.add(obj.lightPosition, 'z').min(-chunkWidth*chunksNum).max(chunkWidth*chunksNum).step(1);
 lightPositionFolder.add(obj.lightPosition, 'ambient').min(0).max(2).step(0.01);
 lightPositionFolder.add(obj.lightPosition, 'gamma').min(0).max(2).step(0.01);
 lightPositionFolder.open()
@@ -420,7 +377,6 @@ var animate = function() {
     }
 
     gl.clearColor(color[0]/255, color[1]/255, color[2]/255, 1);
-    // gl.clearDepth(1.0);
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -432,7 +388,7 @@ var animate = function() {
     gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(aPosition);
 
-        // upload the new matrix data
+    // upload the transformation matrix data
     gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
     setMatrixAttributes(gl, aMmatrix, 4, gl.FLOAT);
@@ -442,15 +398,7 @@ var animate = function() {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatrixData);
     setMatrixAttributes(gl, aNormalMatrix, 4, gl.FLOAT);
 
-    // // Create and store data into color buffer
-    // var color_buffer = createBufferFromArray(new Float32Array(colors), gl.ARRAY_BUFFER);
-    // gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
-
-    // var _color = gl.getAttribLocation(mainProgram, "aColor");
-    // gl.vertexAttribPointer(_color, 4, gl.FLOAT, false, 0, 0) ;
-    // gl.enableVertexAttribArray(_color);
-    // ext.vertexAttribDivisorANGLE(_color, 1);
-
+    // Upload the texture matrix data
     gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
     setMatrixAttributes(gl, aTextureMatrix, 3, gl.FLOAT);
@@ -488,9 +436,9 @@ var animate = function() {
     gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
-    gl.uniform3fv(uLightPosition, [ n * time % 1.1,
-                                    2 * height * Math.sqrt(Math.max(Math.sin(time % 1.1*Math.PI), 0)),
-                                    n * time % 1.1]);
+    gl.uniform3fv(uLightPosition, [ chunkWidth * chunksNum * time % 1.1,
+                                    2 * chunkHeight * Math.sqrt(Math.max(Math.sin(time % 1.1*Math.PI), 0)),
+                                    chunkWidth * chunksNum * time % 1.1]);
     
     gl.uniform1i(uTexture, 0);
 
@@ -527,20 +475,48 @@ var animate = function() {
     
     if(ray.hit){
         // console.log(ray.normal);
+        blockSelected = true
         drawPicker(time, ray.position, proj_matrix, view_matrix)
         if(breakBlock){
+            countInstances--;
+            // last instanced block is getting the instances number of the breaking block
+            const pos = world.getBlockPositionByInstance(countInstances);
+            world.getBlock(pos.x, pos.y, pos.z).instanceId = world.getBlock(ray.position.x,ray.position.y, ray.position.z).instanceId;
+            
+            // remove the broken block from the instances
             world.setBlockId(ray.position.x,ray.position.y, ray.position.z, 0);
             world.setBlockInstanceId(ray.position.x,ray.position.y, ray.position.z, null);
+
+            // regenerate the chunk with the block that was switched
+            mat,countInstances = world.getChunk(pos.x, pos.y, pos.z).generateMesh({positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances)
+            // regenerate the chunk with the broken block 
+            mat,countInstances = world.getChunk(ray.position.x, ray.position.y, ray.position.z).generateMesh({positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances)
+            
             breakBlock = false;
-            generateMesh()
         }
         if(placeBlock){
-            world.setBlockId(ray.position.x + ray.normal.x,
+            const chunk = world.getChunk(ray.position.x + ray.normal.x,
                 ray.position.y + ray.normal.y, 
-                ray.position.z + ray.normal.z, 2);
+                ray.position.z + ray.normal.z);
+            
+            if(chunk){
+                world.setBlockId(ray.position.x + ray.normal.x,
+                    ray.position.y + ray.normal.y, 
+                    ray.position.z + ray.normal.z, 2);
+    
+                world.setBlockInstanceId(ray.position.x + ray.normal.x,
+                    ray.position.y + ray.normal.y, 
+                    ray.position.z + ray.normal.z, countInstances);
+                
+                countInstances++;
+
+                mat,countInstances = chunk.generateMesh({positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances)
+            }
             placeBlock = false;
-            generateMesh()
         }
+    }
+    else{
+        blockSelected = false
     }
 
     if (isDebugOn()){
@@ -570,16 +546,15 @@ function drawPicker(time, pos, Pmatrix, Vmatrix){
     gl.enableVertexAttribArray(pickerColor);
     gl.vertexAttribPointer(pickerColor, 3, gl.UNSIGNED_BYTE, true, 0, 0);
 
-    var matrix = translate([1,0,0,0,
-        0,1,0,0,
-        0,0,1,0,
-        0,0,0,1
-    ], pos.x + 0.5, pos.y+ 0.5, pos.z+ 0.5)
-
     gl.uniformMatrix4fv(pickeruPmatrix, false, Pmatrix);
     gl.uniformMatrix4fv(pickeruVmatrix, false, Vmatrix);
-    gl.uniformMatrix4fv(pickeruMmatrix, false, matrix);
-    gl.uniform1f(uAlphaColor, Math.sin(time*64) / 4 + 0.7);
+    gl.uniformMatrix4fv(pickeruMmatrix, false, [1,0,0,0,
+                                                0,1,0,0,
+                                                0,0,1,0,
+                                                pos.x + 0.5,pos.y+ 0.5,pos.z+ 0.5,1
+                                            ]);
+                                            
+    gl.uniform1f(uAlphaColor, Math.sin(time*64) / 16 + 0.85);
     
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pickerIndexbuffer);
 
