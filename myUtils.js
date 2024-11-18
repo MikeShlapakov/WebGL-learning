@@ -263,10 +263,7 @@ class World {
 
         const chunkX = Math.floor(x / this.chunkSize.width);
         const chunkZ = Math.floor(z / this.chunkSize.width);
-        if (chunkZ >= chunksNum || chunkX >= chunksNum ){
-            // console.log("trying to get chunk out of borders")
-            return null;
-        }
+
         return this.chunks.find((chunk) => chunk.position.x == chunkX * this.chunkSize.width &&
                                             chunk.position.z == chunkZ * this.chunkSize.width);
     }
@@ -395,6 +392,43 @@ class World {
         
         this.generateAllMeshes();
 
+        return (this.matrices, this.countInstances);
+    }
+
+    renderChunks(chunkX, chunkZ){
+        const prevChuncks = this.chunks;
+
+        const needToRender = []
+        for (let x = -this.renderDist; x <= this.renderDist; x++) {
+            for (let z = -this.renderDist; z <= this.renderDist; z++) {
+                needToRender.push({x: chunkX + x, z: chunkZ + z});
+            }   
+        }
+
+        this.chunks = this.chunks.filter((chunk) => 
+            needToRender.find((coords) => chunk.position.x / this.chunkSize.width == coords.x &&
+                                        chunk.position.z / this.chunkSize.width == coords.z)
+        )
+
+        const needToAdd = needToRender.filter((coords) => 
+            !this.chunks.find((chunk) => chunk.position.x / this.chunkSize.width == coords.x &&
+                                        chunk.position.z / this.chunkSize.width == coords.z)
+        )
+
+        needToAdd.forEach((coords) => {
+            const chunk = new Chunk(this.chunkSize, { x: coords.x * this.chunkSize.width, z: coords.z * this.chunkSize.width}, this.worldParams);
+            chunk.generateTerrain();
+            chunk.generateMesh();
+            this.chunks.push(chunk)
+        })
+
+        for (let chunk = 0; chunk < prevChuncks.length; chunk++) {
+            if (!this.chunks.includes(prevChuncks[chunk])){
+                this.generateAllMeshes();
+                break;
+            }
+        }
+        
         return (this.matrices, this.countInstances);
     }
 

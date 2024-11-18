@@ -15,10 +15,10 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-let chunkWidth = 16;
-let chunkHeight = 16;
-const chunksNum = 2;
-let renderDistance = chunksNum - 1
+const chunkWidth = 16;
+const chunkHeight = 16;
+const chunksNum = 4;
+const renderDistance = chunksNum - 1
 
 const textureSize = 32
 let atlasWidth = 192
@@ -55,7 +55,7 @@ let textureCoords = [
 
 let textureOffsets = [[5,0], [0,0], [1,0], [2,0], [3,0], [4,0]]
 
-var faceMatrices = [
+const faceMatrices = [
     identity(),
     xRotation(Math.PI),
     yRotate(zRotation(Math.PI / -2), Math.PI / -2),
@@ -313,7 +313,7 @@ var obj = {
     FOV: 60,
     speed: 0.5,
     // rotationSpeed: 0.02, // Speed of rotation
-    zMax: Math.max(10, chunkWidth*chunksNum*chunksNum),
+    zMax: Math.max(10, chunkWidth*chunksNum),
     zMin: 0.25,
     skyColor: [ 150, 220, 255 ], // RGB array
     fogNear: 0.75,
@@ -418,6 +418,8 @@ var animate = function() {
 
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
     var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, yaw, pitch);
+    mat, countInstances = world.renderChunks(Math.floor(obj.cameraPosition.x / chunkWidth), 
+                                            Math.floor(obj.cameraPosition.z / chunkWidth))
     cameraPositionFolder.updateDisplay()
     var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.cos(yaw),
                     cameraPositionArray[1] - Math.sin(pitch),
