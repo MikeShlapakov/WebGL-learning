@@ -17,7 +17,7 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 const chunkWidth = 16;
 const chunkHeight = 16;
-const chunksNum = 4;
+const chunksNum = 6;
 const renderDistance = chunksNum - 1
 
 const textureSize = 32
@@ -184,7 +184,8 @@ var crosshairColorBuffer = createBufferFromArray(new Uint8Array([
 /*========== Defining and storing the geometry ==========*/
 
 // setup matrices, one per instance
-const numInstances = chunkWidth*chunksNum*chunkHeight*chunkWidth*chunksNum;
+const numInstances = Math.min(chunkWidth*chunksNum*chunkHeight*chunkWidth*chunksNum, 2<<15);
+console.log("Max Instances number:", numInstances)
 // make a typed array with one view per matrix
 const matrixData = new Float32Array(numInstances * 16);
 const matrices = [];

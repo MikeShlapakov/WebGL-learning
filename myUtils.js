@@ -533,15 +533,20 @@ class Chunk {
             return false;
         }
 
-        // Check if it's on the edge of the grid
-        if (x === 0 || x === this.size.width - 1 || y === 0 || y === this.size.height - 1 || z === 0 || z === this.size.width - 1) {
-            return true;
-        }
+        // console.log(world)
+        // Check all six faces
+        const neighbors = [
+            this.getBlock(x - 1, y, z), // Left
+            this.getBlock(x + 1, y, z), // Right
+            this.getBlock(x, y - 1, z), // Bottom
+            this.getBlock(x, y + 1, z), // Top
+            this.getBlock(x, y, z - 1), // Back
+            this.getBlock(x, y, z + 1)  // Front
+        ];
 
-        // Check if any neighboring cube is missing
-        return !this.chunkGrid[x - 1][y][z].id || !this.chunkGrid[x + 1][y][z].id ||
-               !this.chunkGrid[x][y - 1][z].id || !this.chunkGrid[x][y + 1][z].id ||
-               !this.chunkGrid[x][y][z - 1].id || !this.chunkGrid[x][y][z + 1].id;
+        for(let neighbor of neighbors){
+            if (neighbor && !neighbor.id) return true;
+        }
     }
 
     generateTerrain() {
