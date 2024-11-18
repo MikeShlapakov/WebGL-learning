@@ -89,10 +89,14 @@ function degToRad(d) {
     return d * Math.PI / 180;
 }
 
-const keys = {'`': true}
+const keys = {'`': true, 't': true}
 
 function isDebugOn(){
     return keys['`'];
+}
+
+function showLines(){
+    return keys['t'];
 }
 
 function calculateCameraPos(cameraPos, speed, yaw, pitch){
@@ -183,6 +187,9 @@ document.addEventListener('keydown', function(event) {
         case '`': // Debug screen
             keys['`'] = !keys['`'];
             break;
+        case 't': // Debug screen
+            keys['t'] = !keys['t'];
+            break;
         default:
             break;
     }
@@ -239,25 +246,14 @@ class RNG {
 }
 
 class World {
-    constructor(chunkSize, numChunks, matrices, countInstances, worldParams = {seed: 123, terrain: {scale: 20,offset: 0,magnitude: 1}}) {
+    constructor(chunkSize, renderDist, matrices, countInstances, worldParams = {seed: 123, terrain: {scale:30,offset: 0,magnitude: 1}}) {
         this.chunkSize = chunkSize;
-        this.numChunks = numChunks;
+        this.renderDist = renderDist;
         this.matrices = matrices;
         this.worldParams = worldParams;
         this.countInstances = countInstances;
         
-        this.chunks = this.initializeChunks();
-    }
-
-    initializeChunks() {
-        const chunks = [];
-        for (let chunkX = 0; chunkX < this.numChunks; chunkX++) {
-            for (let chunkZ = 0; chunkZ < this.numChunks; chunkZ++) {
-                const chunk = new Chunk(this.chunkSize, { x: chunkX * this.chunkSize.width, z: chunkZ * this.chunkSize.width }, this.worldParams);
-                chunks.push(chunk);
-            }
-        }
-        return chunks;
+        this.chunks = [];
     }
 
     getChunk(x, y, z) {
@@ -267,55 +263,152 @@ class World {
 
         const chunkX = Math.floor(x / this.chunkSize.width);
         const chunkZ = Math.floor(z / this.chunkSize.width);
-        if (chunkZ < 0 || chunkX < 0){
+        if (chunkZ >= chunksNum || chunkX >= chunksNum ){
+            // console.log("trying to get chunk out of borders")
             return null;
         }
-        if (chunkZ >= this.numChunks || chunkX >= this.numChunks ){
-            // console.log("true")
-            return null;
-        }
-        // console.log(chunkX, chunkZ)
-        return this.chunks[chunkX * this.numChunks + chunkZ];
+        return this.chunks.find((chunk) => chunk.position.x == chunkX * this.chunkSize.width &&
+                                            chunk.position.z == chunkZ * this.chunkSize.width);
     }
 
     generateChunks(){
-        let mat = {}
-        for (let x = 0; x < this.numChunks; x++) {
-            for (let z = 0; z < this.numChunks; z++) {
-                const chunk = this.chunks[x * this.numChunks + z];
-                chunk.generateTerrain();
-                // console.log(this.chunks);
-                this.matrices, this.countInstances = chunk.generateMesh(this.matrices, this.countInstances);
+        for (let x = -this.renderDist; x <= this.renderDist; x++) {
+            for (let z = -this.renderDist; z <= this.renderDist; z++) {
+                this.generateChunk(x, z);
             }
         }
-        // console.log(this.countInstances);
         return (this.matrices, this.countInstances);
     }
 
-    getBlockPositionByInstance(instance){
-        for (let chunkX = 0; chunkX < this.numChunks; chunkX++) {
-            for (let chunkZ = 0; chunkZ < this.numChunks; chunkZ++) {
-                const block = this.chunks[chunkX * this.numChunks + chunkZ].getBlockPositionByInstance(instance);
-                if(block){
-                    return block;
-                }
+    generateChunk(chunkX, chunkZ){
+        const chunk = new Chunk(this.chunkSize, { x: chunkX * this.chunkSize.width, z: chunkZ * this.chunkSize.width}, this.worldParams);
+        chunk.generateTerrain();
+        chunk.generateMesh();
+
+        for (let i = 0; i < chunk.instanceCount; i++) {
+            if (chunk.mesh.getPositionMatrix(i) === null) break;
+            const positionMatrix = chunk.mesh.getPositionMatrix(i);
+            const normalMatrix = chunk.mesh.getNormalMatrix(i);
+            const textureMatrix = chunk.mesh.getTextureMatrix(i);
+            for (let j = 0; j < 16; ++j) {
+                this.matrices.positionMatrices[this.countInstances + i][j] = positionMatrix[j];
+                this.matrices.normalMatrices[this.countInstances + i][j] = normalMatrix[j]; 
+            }
+            for (let j = 0; j < 9; ++j) {
+                this.matrices.textureMatrices[this.countInstances + i][j] = textureMatrix[j];
             }
         }
+        this.countInstances += chunk.instanceCount;
+        this.chunks.push(chunk);
+    }
+
+    generateAllMeshes(){
+        let chunkStartIndex = 0;
+        for (let c = 0; c < this.chunks.length; c++) {
+            for (let i = 0; i < this.chunks[c].instanceCount; i++) {
+                if (this.chunks[c].mesh.getPositionMatrix(i) === null) break;
+                const positionMatrix = this.chunks[c].mesh.getPositionMatrix(i);
+                const normalMatrix = this.chunks[c].mesh.getNormalMatrix(i);
+                const textureMatrix = this.chunks[c].mesh.getTextureMatrix(i);
+                for (let j = 0; j < 16; ++j) {
+                    this.matrices.positionMatrices[chunkStartIndex + i][j] = positionMatrix[j];
+                    this.matrices.normalMatrices[chunkStartIndex + i][j] = normalMatrix[j]; 
+                }
+                for (let j = 0; j < 9; ++j) {
+                    this.matrices.textureMatrices[chunkStartIndex + i][j] = textureMatrix[j];
+                }
+            }
+            chunkStartIndex += this.chunks[c].instanceCount;
+        }
+        this.countInstances = chunkStartIndex;
+    }
+
+    removeBlock(x, y, z){
+        // last instanced block is getting the instances number of the breaking block
+        const chunk = this.getChunk(x, y, z);
+        chunk.toGenerate = true;
+        const skipInstances = chunk.instanceCount;
+
+        chunk.instanceCount--;
+        const pos = chunk.getBlockPositionByInstance(chunk.instanceCount);
+
+        chunk.setBlockInstanceId(pos.x, pos.y, pos.z, this.getBlock(x, y, z).instanceId);
+
+        // remove the broken block from the instances
+        this.setBlockId(x, y, z, 0);
+        this.setBlockInstanceId(x, y, z, null);
+
+        // regenerate the chunk
+        chunk.generateMesh();
+
+        this.generateAllMeshes();
+        // let chunkStartIndex = 0;
+        // for (let i = 0; i < this.chunks.length; i++) {
+        //     if (this.chunks[i].toGenerate){
+        //         this.chunks.splice(i, 1);
+        //         break;
+        //     }
+        //     chunkStartIndex += this.chunks[i].instanceCount;
+        // }
+
+        // this.chunks.push(chunk);
+
+        // for (let i = chunkStartIndex; i < this.countInstances - skipInstances; i++) {
+        //     for (let j = 0; j < 16; ++j) {
+        //         this.matrices.positionMatrices[i][j] = this.matrices.positionMatrices[i + skipInstances][j];
+        //         this.matrices.normalMatrices[i][j] = this.matrices.normalMatrices[i + skipInstances][j]; 
+        //     }
+        //     for (let j = 0; j < 9; ++j) {
+        //         this.matrices.textureMatrices[i][j] = this.matrices.textureMatrices[i + skipInstances][j];
+        //     }
+        // }
+
+        // for (let i = 0; i < chunk.instanceCount; i++) {
+        //     const positionMatrix = chunk.mesh.getPositionMatrix(i);
+        //     const normalMatrix = chunk.mesh.getNormalMatrix(i);
+        //     const textureMatrix = chunk.mesh.getTextureMatrix(i);
+        //     for (let j = 0; j < 16; ++j) {
+        //         this.matrices.positionMatrices[this.countInstances - skipInstances + i][j] = positionMatrix[j];
+        //         this.matrices.normalMatrices[this.countInstances - skipInstances + i][j] = normalMatrix[j]; 
+        //     }
+        //     for (let j = 0; j < 9; ++j) {
+        //         this.matrices.textureMatrices[this.countInstances - skipInstances +i][j] = textureMatrix[j];
+        //     }
+        // }
+
+        // chunk.toGenerate = false;
+        // this.countInstances += chunk.instanceCount - skipInstances;
+        return (this.matrices, this.countInstances);
+    }
+
+    addBlock(x, y, z){
+        
+        const chunk = this.getChunk(x, y, z);
+        if(!chunk) return (this.matrices, this.countInstances);
+
+        this.setBlockId(x, y, z, 2);
+
+        this.setBlockInstanceId(x, y, z, chunk.instanceCount);
+        chunk.instanceCount++;
+
+        chunk.generateMesh()
+        
+        this.generateAllMeshes();
+
+        return (this.matrices, this.countInstances);
     }
 
     getBlock(x, y, z) {
-        const localX = x % this.chunkSize.width;
-        const localZ = z % this.chunkSize.width;
-
+        const localX = (x % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
+        const localZ = (z % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
         const chunk = this.getChunk(x, y, z);
-        // console.log(chunk)  
+
         return chunk ? chunk.getBlock(localX, y, localZ) : null;
     }
 
     setBlockId(x, y, z, id) {
-        const localX = x % this.chunkSize.width;
-        const localZ = z % this.chunkSize.width;
-
+        const localX = (x % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
+        const localZ = (z % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;        
         const chunk = this.getChunk(x, y, z);
         if (chunk) {
             chunk.setBlockId(localX, y, localZ, id);
@@ -323,9 +416,8 @@ class World {
     }
 
     setBlockInstanceId(x, y, z, instanceId) {
-        const localX = x % this.chunkSize.width;
-        const localZ = z % this.chunkSize.width;
-
+        const localX = (x % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
+        const localZ = (z % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
         const chunk = this.getChunk(x, y, z);
         if (chunk) {
             chunk.setBlockInstanceId(localX, y, localZ, instanceId);
@@ -343,6 +435,9 @@ class Chunk {
         this.perlinNoise = new PerlinNoise(this.rng);
 
         this.chunkGrid = this.initializeGrid();
+
+        this.mesh = new Mesh(chunkSize.width * chunkSize.height * chunkSize.width);
+        this.instanceCount = 0;
     }
 
     initializeGrid() {
@@ -371,7 +466,7 @@ class Chunk {
                 for (let z = 0; z < this.size.width; z++) {
                     const block = this.getBlock(x, y, z);
                     if(block.instanceId == instance){
-                        return {x: this.position.x + x, y: y, z: this.position.z + z};
+                        return {x: x, y: y, z: z};
                     };
                 }
             }
@@ -419,8 +514,8 @@ class Chunk {
         for (let x = 0; x < this.size.width; x++) {
             for (let z = 0; z < this.size.width; z++) {
                 const value = this.perlinNoise.noise(
-                    (this.position.x + x) / this.params.terrain.scale,
-                    (this.position.z + z) / this.params.terrain.scale,
+                    (this.position.x + x >= 0 ? 2*(this.position.x + x) : -2*(this.position.x + x) - 1) / this.params.terrain.scale,
+                    (this.position.z + z >= 0 ? 2*(this.position.z + z) : -2*(this.position.z + z) - 1) / this.params.terrain.scale,
                     1
                 );
                 const scaledNoise = value * this.params.terrain.magnitude + this.params.terrain.offset;
@@ -437,7 +532,7 @@ class Chunk {
         }
     }
 
-    generateMesh(matrices, countInstances){
+    generateMesh(){
         // update all the matrices
         for(let x = 0; x < this.size.width; x++){
             // console.log(x/n * 100)
@@ -445,32 +540,97 @@ class Chunk {
                 for(let z = 0; z < this.size.width; z++){
 
                     if (this.isCubeVisible(x, y, z)) {
-                        if(this.getBlock(x, y, z).instanceId == null){
-                            this.setBlockInstanceId(x, y, z, countInstances) 
-                            countInstances++;
+                        let instanceNum = this.getBlock(x, y, z).instanceId;
+                        if(instanceNum == null){
+                            this.setBlockInstanceId(x, y, z, this.instanceCount) 
+                            instanceNum = this.instanceCount;
+                            this.instanceCount++;
                         }
 
-                        const instanceNum = this.getBlock(x, y, z).instanceId;
-
-                        translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5, matrices.positionMatrices[instanceNum]);
-                        let m = []
+                        this.mesh.setPositionMatrix(instanceNum, translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5));
+                        let textureMatrix = []
                         if (this.getBlock(x, y, z).id == 2) {
                             // colors.push(1.0, 0.15, 0.045, 1)
-                            m = getTexturMatrix(0, textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
+                            textureMatrix = getTexturMatrix(0, textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
     
                         } else if (this.getBlock(x, y, z).id == 1) {
                             // colors.push(0.4, 0.9, 0.3, 1)
-                            m = getTexturMatrix(0, 0, textureSize, textureSize, atlasWidth, atlasHeight)
+                            textureMatrix = getTexturMatrix(0, 0, textureSize, textureSize, atlasWidth, atlasHeight)
                         }
-                        for (let j = 0; j < 9; ++j) {
-                            matrices.textureMatrices[instanceNum][j] = m[j]
-                        }
-                        transpose(inverse(matrices.positionMatrices[instanceNum]), matrices.normalMatrices[instanceNum])
+                        this.mesh.setTextureMatrix(instanceNum, textureMatrix)
+                        this.mesh.setNormalMatrix(instanceNum, transpose(inverse(this.mesh.getPositionMatrix(instanceNum))))
                     }
                 }
             }
         }
-        return (matrices, countInstances);
+    }
+}
+
+class Mesh {
+    constructor(meshSize) {
+        this.meshSize = meshSize;
+        this.positionMatrix = new Array(meshSize).fill(null);
+        this.normalMatrix = new Array(meshSize).fill(null);
+        this.textureMatrix = new Array(meshSize).fill(null);
+    }
+
+    // Helper function to check bounds
+    isValidIndex(index) {
+        if (index >= 0 && index < this.meshSize) {
+            return true;
+        }
+        console.log('Index out of mesh bounds');
+        return false;
+    }
+
+    // Getters
+    getPositionMatrix(index) {
+        if (this.isValidIndex(index)) {
+            return this.positionMatrix[index];
+        }
+    }
+
+    getNormalMatrix(index) {
+        if (this.isValidIndex(index)) {
+            return this.normalMatrix[index];
+        }
+    }
+
+    getTextureMatrix(index) {
+        if (this.isValidIndex(index)) {
+            return this.textureMatrix[index];
+        }
+    }
+
+    // Setters
+    setPositionMatrix(index, value) {
+        if (this.isValidIndex(index)) {
+            if (value.length === 16) {
+                this.positionMatrix[index] = value;
+            } else {
+                throw new Error('Value must be of length 16');
+            }
+        }
+    }
+
+    setNormalMatrix(index, value) {
+        if (this.isValidIndex(index)) {
+            if (value.length === 16) {
+                this.normalMatrix[index] = value;
+            } else {
+                throw new Error('Value must be of length 16');
+            }
+        }
+    }
+
+    setTextureMatrix(index, value) {
+        if (this.isValidIndex(index)) {
+            if (value.length === 9) {
+                this.textureMatrix[index] = value;
+            } else {
+                throw new Error('Value must be of length 9');
+            }
+        }
     }
 }
 

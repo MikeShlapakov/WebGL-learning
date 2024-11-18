@@ -17,7 +17,8 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 let chunkWidth = 16;
 let chunkHeight = 16;
-let chunksNum = 4;
+const chunksNum = 2;
+let renderDistance = chunksNum - 1
 
 const textureSize = 32
 let atlasWidth = 192
@@ -214,7 +215,7 @@ gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
 let mat = []
-const world = new World({width:chunkWidth, height:chunkHeight}, chunksNum, {positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances);
+const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances);
 mat,countInstances = world.generateChunks();
 
 console.log("Number of instances:", countInstances)
@@ -307,12 +308,12 @@ let renderSum = 0; // sum of render time for each frame
 var precentage = {precent: 0}
 var obj = {
     FPS: 0,
-    cameraPosition: {x: 1, y:1, z:3},
+    cameraPosition: {x: chunkWidth/2, y:chunkHeight+1, z: chunkWidth/2},
     lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), ambient: 0.3, gamma: 1},
     FOV: 60,
     speed: 0.5,
     // rotationSpeed: 0.02, // Speed of rotation
-    zMax: chunkWidth*chunksNum,
+    zMax: Math.max(10, chunkWidth*chunksNum*chunksNum),
     zMin: 0.25,
     skyColor: [ 150, 220, 255 ], // RGB array
     fogNear: 0.75,
@@ -436,9 +437,9 @@ var animate = function() {
     gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
-    gl.uniform3fv(uLightPosition, [ chunkWidth * chunksNum * time % 1.1,
+    gl.uniform3fv(uLightPosition, [ chunkWidth * chunksNum * (time % 1.1),
                                     2 * chunkHeight * Math.sqrt(Math.max(Math.sin(time % 1.1*Math.PI), 0)),
-                                    chunkWidth * chunksNum * time % 1.1]);
+                                    chunkWidth * chunksNum * (time % 1.1)]);
     
     gl.uniform1i(uTexture, 0);
 
@@ -448,7 +449,7 @@ var animate = function() {
         gl.uniform2fv(uTextureOffset, new Float32Array(textureOffsets[ndx]));
         gl.uniform3fv(uNormal, new Float32Array(normals[ndx]));
         gl.uniformMatrix4fv(uFaceMatrix, false, faceMatrix);
-        ext.drawElementsInstancedANGLE(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
+        ext.drawElementsInstancedANGLE(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
     });
     
     renderSum += performance.now() - renderTime
@@ -456,7 +457,7 @@ var animate = function() {
 
     // Update FPS every second
     if (frameCount >= 100) {
-        FPS.setValue(Math.round((frameCount * 100) / (renderSum)));
+        FPS.setValue(Math.round((frameCount * 600) / (renderSum)));
         frameCount = 0;
         renderSum = 0;
     }
@@ -474,44 +475,18 @@ var animate = function() {
         }, 5)
     
     if(ray.hit){
-        // console.log(ray.normal);
+        // console.log(ray);
         blockSelected = true
         drawPicker(time, ray.position, proj_matrix, view_matrix)
         if(breakBlock){
-            countInstances--;
-            // last instanced block is getting the instances number of the breaking block
-            const pos = world.getBlockPositionByInstance(countInstances);
-            world.getBlock(pos.x, pos.y, pos.z).instanceId = world.getBlock(ray.position.x,ray.position.y, ray.position.z).instanceId;
-            
-            // remove the broken block from the instances
-            world.setBlockId(ray.position.x,ray.position.y, ray.position.z, 0);
-            world.setBlockInstanceId(ray.position.x,ray.position.y, ray.position.z, null);
-
-            // regenerate the chunk with the block that was switched
-            mat,countInstances = world.getChunk(pos.x, pos.y, pos.z).generateMesh({positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances)
-            // regenerate the chunk with the broken block 
-            mat,countInstances = world.getChunk(ray.position.x, ray.position.y, ray.position.z).generateMesh({positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances)
-            
+            mat,countInstances = world.removeBlock(ray.position.x, ray.position.y, ray.position.z);
+            // console.log("done", world.chunks, countInstances)
             breakBlock = false;
         }
         if(placeBlock){
-            const chunk = world.getChunk(ray.position.x + ray.normal.x,
-                ray.position.y + ray.normal.y, 
-                ray.position.z + ray.normal.z);
-            
-            if(chunk){
-                world.setBlockId(ray.position.x + ray.normal.x,
-                    ray.position.y + ray.normal.y, 
-                    ray.position.z + ray.normal.z, 2);
-    
-                world.setBlockInstanceId(ray.position.x + ray.normal.x,
-                    ray.position.y + ray.normal.y, 
-                    ray.position.z + ray.normal.z, countInstances);
-                
-                countInstances++;
-
-                mat,countInstances = chunk.generateMesh({positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances)
-            }
+            mat,countInstances = world.addBlock(ray.position.x + ray.normal.x,
+                                                ray.position.y + ray.normal.y, 
+                                                ray.position.z + ray.normal.z)
             placeBlock = false;
         }
     }
