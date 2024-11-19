@@ -17,7 +17,7 @@ canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 const chunkWidth = 16;
 const chunkHeight = 16;
-const chunksNum = 6;
+const chunksNum = 4;
 const renderDistance = chunksNum - 1
 
 const textureSize = 32
@@ -87,7 +87,6 @@ var aMmatrix = gl.getAttribLocation(mainProgram, "aMmatrix");
 var uFaceMatrix = gl.getUniformLocation(mainProgram, "uFaceMatrix");
 
 var uNormal = gl.getUniformLocation(mainProgram, "uNormal");
-var aNormalMatrix = gl.getAttribLocation(mainProgram, "aNormalMatrix");
 
 var aTexture = gl.getAttribLocation(mainProgram, "aTextCoord");
 var aTextureMatrix = gl.getAttribLocation(mainProgram, "aTextureMatrix");
@@ -196,15 +195,6 @@ const matrixBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
 
-const normalMatrixData = new Float32Array(numInstances * 16);
-const normalMatrices = [];
-for (let i = 0; i < numInstances; ++i) {
-  normalMatrices.push(new Float32Array(normalMatrixData.buffer, i * 16 * 4, 16));
-}
-const normalMatrixBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, normalMatrixBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, normalMatrixData.byteLength, gl.DYNAMIC_DRAW);
-
 const textureMatricesData = new Float32Array(numInstances * 9);
 const textureMatrices = [];
 for (let i = 0; i < numInstances; ++i) {
@@ -216,8 +206,9 @@ gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
 let mat = []
-const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances);
-mat,countInstances = world.generateChunks();
+const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {positionMatrices:matrices, textureMatrices: textureMatrices}, countInstances);
+world.generateChunks();
+mat,countInstances = world.generateAllMeshes();
 
 console.log("Number of instances:", countInstances)
 
@@ -332,9 +323,9 @@ cameraPositionFolder.add(obj.cameraPosition, 'y')
 cameraPositionFolder.add(obj.cameraPosition, 'z')
 cameraPositionFolder.open()
 var lightPositionFolder = gui.addFolder('Light Position')
-lightPositionFolder.add(obj.lightPosition, 'x').min(-chunkWidth*chunksNum).max(chunkWidth*chunksNum).step(1);
-lightPositionFolder.add(obj.lightPosition, 'y').min(-chunkWidth*chunksNum).max(chunkWidth*chunksNum).step(1);
-lightPositionFolder.add(obj.lightPosition, 'z').min(-chunkWidth*chunksNum).max(chunkWidth*chunksNum).step(1);
+lightPositionFolder.add(obj.lightPosition, 'x').min(-chunkWidth*chunksNum*2).max(chunkWidth*chunksNum*2).step(1);
+lightPositionFolder.add(obj.lightPosition, 'y').min(-chunkHeight*2).max(chunkHeight*2).step(1);
+lightPositionFolder.add(obj.lightPosition, 'z').min(-chunkWidth*chunksNum*2).max(chunkWidth*chunksNum*2).step(1);
 lightPositionFolder.add(obj.lightPosition, 'ambient').min(0).max(2).step(0.01);
 lightPositionFolder.add(obj.lightPosition, 'gamma').min(0).max(2).step(0.01);
 lightPositionFolder.open()
@@ -395,11 +386,6 @@ var animate = function() {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
     setMatrixAttributes(gl, aMmatrix, 4, gl.FLOAT);
 
-    // Upload the normal matrix data
-    gl.bindBuffer(gl.ARRAY_BUFFER, normalMatrixBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatrixData);
-    setMatrixAttributes(gl, aNormalMatrix, 4, gl.FLOAT);
-
     // Upload the texture matrix data
     gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
@@ -443,6 +429,9 @@ var animate = function() {
     gl.uniform3fv(uLightPosition, [ chunkWidth * chunksNum * (time % 1.1),
                                     2 * chunkHeight * Math.sqrt(Math.max(Math.sin(time % 1.1*Math.PI), 0)),
                                     chunkWidth * chunksNum * (time % 1.1)]);
+    // gl.uniform3fv(uLightPosition, [ obj.lightPosition.x,
+    //                                 obj.lightPosition.y,
+    //                                 obj.lightPosition.z]);
     
     gl.uniform1i(uTexture, 0);
 
