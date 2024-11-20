@@ -20,9 +20,10 @@ const chunkHeight = 16;
 const chunksNum = 4;
 const renderDistance = chunksNum - 1
 
+const typesOfBlocks = 5
 const textureSize = 32
 let atlasWidth = 192
-let atlasHeight = 128
+let atlasHeight = 320
 
 
 let vertices = [ 
@@ -79,6 +80,9 @@ const pickerProgram = createProgramFromSource(gl, {vertexShader:"picker-vertex-s
 
 const crosshairProgram = createProgramFromSource(gl, {vertexShader:"crosshair-vertex-shader",
                                                 fragmentShader:"crosshair-fragment-shader"})
+
+const handBlockProgram = createProgramFromSource(gl, {vertexShader:"hand-block-vertex-shader",
+                                                    fragmentShader:"hand-block-fragment-shader"})
 
 /*======== Associating attributes to vertex shader =====*/
 var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
@@ -180,6 +184,35 @@ var crosshairColorBuffer = createBufferFromArray(new Uint8Array([
     0, 100, 0,
 ]), gl.ARRAY_BUFFER);
 
+/*======== Setting Hand Block attributes =====*/
+
+var handBlockPosition = gl.getAttribLocation(handBlockProgram, "aPosition");
+var handBlockuMmatrix = gl.getUniformLocation(handBlockProgram, "uMmatrix");
+
+var handBlockPositionBuffer = createBufferFromArray(new Float32Array([
+     0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
+    -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
+    -0.5, -0.5,  0.5, -0.5, -0.5, -0.5,
+    -0.5,  0.5, -0.5, -0.5,  0.5,  0.5,
+     0.5, -0.5, -0.5,  0.5, -0.5,  0.5,
+     0.5,  0.5,  0.5,  0.5,  0.5, -0.5,
+    -0.5, -0.5, -0.5,  0.5, -0.5, -0.5,
+     0.5,  0.5, -0.5, -0.5,  0.5, -0.5,
+     0.5, -0.5,  0.5, -0.5, -0.5,  0.5,
+    -0.5,  0.5,  0.5,  0.5,  0.5,  0.5,
+     0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
+    -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,
+]), gl.ARRAY_BUFFER);
+
+var handBlockIndexbuffer = createBufferFromArray(new Uint32Array(
+    [ 0, 1, 2, 0, 2, 3,
+        4, 5, 6, 4, 6, 7,
+        8, 9, 10, 8, 10, 11, 
+        12, 13, 14, 12, 14, 15, 
+        16, 17, 18, 16, 18, 19, 
+        20, 21, 22, 20, 22, 23]
+), gl.ELEMENT_ARRAY_BUFFER);
+
 /*========== Defining and storing the geometry ==========*/
 
 // setup matrices, one per instance
@@ -267,11 +300,12 @@ document.addEventListener('mousemove', e => {
    pitch = -mousePos.y * Math.PI / 2 
 });
 
+let blockType = 3;
 document.addEventListener("wheel", e => {
-   // scale the FOV by 5 units
-   obj.FOV += e.deltaY * 0.05; 
-   // Restrict scale
-   obj.FOV = Math.min(Math.max(10, obj.FOV), 120);
+
+   blockType = 1 + ((blockType += e.deltaY >= 0? 1: -1 )% typesOfBlocks + typesOfBlocks -1) % typesOfBlocks; //    console.log(e.deltaY)
+
+//    obj.FOV = Math.min(Math.max(10, obj.FOV + e.deltaY * 0.05), 120);
    FOV.updateDisplay()
 }, { passive: false });
 
@@ -432,8 +466,6 @@ var animate = function() {
     // gl.uniform3fv(uLightPosition, [ obj.lightPosition.x,
     //                                 obj.lightPosition.y,
     //                                 obj.lightPosition.z]);
-    
-    gl.uniform1i(uTexture, 0);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
 
@@ -478,7 +510,8 @@ var animate = function() {
         if(placeBlock){
             mat,countInstances = world.addBlock(ray.position.x + ray.normal.x,
                                                 ray.position.y + ray.normal.y, 
-                                                ray.position.z + ray.normal.z)
+                                                ray.position.z + ray.normal.z,
+                                                blockType)
             placeBlock = false;
         }
     }
@@ -493,6 +526,8 @@ var animate = function() {
     else{
         gui.close();
     }
+
+    drawHandBlock(time, blockType);
 
     window.requestAnimationFrame(animate);
 }
@@ -548,4 +583,47 @@ function drawCrosshair(){
     gl.uniformMatrix4fv(crosshairTransform, false, matrix);
 
     gl.drawArrays(gl.LINES, 0, 6);
+}
+
+function drawHandBlock(time, blockType){
+    // gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+
+    gl.useProgram(handBlockProgram);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, handBlockPositionBuffer);
+    gl.enableVertexAttribArray(handBlockPosition);
+    gl.vertexAttribPointer(handBlockPosition, 3, gl.FLOAT, false, 0, 0);
+
+    const w = textureSize/atlasWidth;
+    const h = textureSize/atlasHeight;
+    const textureCoords = [];
+
+    for (let face = 0; face < 6; face++) {
+        const start = face * w;
+        const end = (face + 1) * w;
+
+        textureCoords.push(
+            end, blockType * h, start, blockType * h, start, (blockType - 1) * h, end, (blockType - 1) * h
+        );
+    }
+    var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+    gl.enableVertexAttribArray(aTexture);
+    gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 0, 0);
+
+    var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    var matrix = get_projection(1, aspect, 0, 1);
+    matrix = xRotate(matrix, -Math.PI/8);
+
+    matrix = yRotate(matrix, time*16);
+    matrix[15] = gl.canvas.clientWidth * 0.4;
+    matrix[12] = matrix[15] * 0.8;
+    matrix[13] = matrix[15] * (Math.sin(time*32) * 0.025 - 0.7);
+
+    gl.uniformMatrix4fv(handBlockuMmatrix, false, matrix);                       
+    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, handBlockIndexbuffer);
+
+    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, 0);
 }

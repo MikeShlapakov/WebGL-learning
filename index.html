@@ -168,5 +168,32 @@
             }
         </script>
 
+        <script id="hand-block-vertex-shader" type="x-shader/x-vertex">
+            attribute vec4 aPosition;
+            
+            attribute vec2 aTextCoord;
+            
+            uniform mat4 uMmatrix;
+            
+            varying vec2 vTextCoord;
+            
+            void main() {
+              gl_Position =  uMmatrix* aPosition;
+    
+              vTextCoord = aTextCoord;
+            }
+        </script>
+
+        <script id="hand-block-fragment-shader" type="x-shader/x-fragment">
+            precision mediump float;
+            
+            uniform sampler2D uTexture;
+            varying vec2 vTextCoord;
+            
+            void main() {
+                gl_FragColor = texture2D(uTexture, vTextCoord) * vec4(.75, .75, .75, 1);
+            }
+        </script>
+
         <script src="./index.js"></script>
 </html>

@@ -341,12 +341,12 @@ class World {
         return (this.matrices, this.countInstances);
     }
 
-    addBlock(x, y, z){
+    addBlock(x, y, z, blockType){
         
         const chunk = this.getChunk(this.positionToChunk(x, y, z));
         if(!chunk) return (this.matrices, this.countInstances);
 
-        this.setBlockId(x, y, z, 2);
+        this.setBlockId(x, y, z, blockType);
 
         this.setBlockInstanceId(x, y, z, chunk.instanceCount);
         chunk.instanceCount++;
@@ -563,7 +563,6 @@ class Chunk {
     generateMesh(){
         // update all the matrices
         for(let x = 0; x < this.size.width; x++){
-            // console.log(x/n * 100)
             for(let y = 0; y < this.size.height; y++){
                 for(let z = 0; z < this.size.width; z++){
 
@@ -577,14 +576,7 @@ class Chunk {
 
                         this.mesh.setPositionMatrix(instanceNum, translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5));
                         let textureMatrix = []
-                        if (this.getBlock(x, y, z).id == 2) {
-                            // colors.push(1.0, 0.15, 0.045, 1)
-                            textureMatrix = getTexturMatrix(0, textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
-    
-                        } else if (this.getBlock(x, y, z).id == 1) {
-                            // colors.push(0.4, 0.9, 0.3, 1)
-                            textureMatrix = getTexturMatrix(0, 0, textureSize, textureSize, atlasWidth, atlasHeight)
-                        }
+                        textureMatrix = getTexturMatrix(0, (this.getBlock(x, y, z).id - 1)*textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
                         this.mesh.setTextureMatrix(instanceNum, textureMatrix)
 
                     }
