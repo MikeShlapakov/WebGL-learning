@@ -24,6 +24,12 @@
         <script src="./myUtils.js"></script>
         <script src="./matrixUtils.js"></script>
         <script src="./perlinNoise.js"></script>
+        <script src="./mesh.js"></script>
+        <script src="./shaderUtils.js"></script>
+        <script src="./physics.js"></script>
+        <script src="./player.js"></script>
+        <script src="./chunks.js"></script>
+        <script src="./world.js"></script>
 
         <script  id="vertex-shader-3d" type="x-shader/x-vertex">
             attribute vec3 aPosition;
@@ -117,29 +123,23 @@
 
         <script id="picker-vertex-shader" type="x-shader/x-vertex">
             attribute vec4 aPosition;
-            attribute vec4 aPickerColor;
             
             uniform mat4 uPmatrix;
             uniform mat4 uVmatrix;
             uniform mat4 uMmatrix;
-            uniform float uAlphaColor;
-            
-            varying vec4 vPickerColor;
             
             void main() {
               gl_Position =  uPmatrix * uVmatrix *uMmatrix* aPosition;
-    
-              vPickerColor = aPickerColor - vec4(0, 0, 0, uAlphaColor);
             }
         </script>
 
         <script id="picker-fragment-shader" type="x-shader/x-fragment">
             precision mediump float;
         
-            varying vec4 vPickerColor;
+            uniform float uAlphaColor;
             
             void main() {
-                gl_FragColor = vPickerColor;
+                gl_FragColor = vec4(0, 0, 0, uAlphaColor);
             }
         </script>
 

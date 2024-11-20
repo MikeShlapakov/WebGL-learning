@@ -123,36 +123,16 @@ var pickeruMmatrix = gl.getUniformLocation(pickerProgram, "uMmatrix");
 var uAlphaColor = gl.getUniformLocation(pickerProgram, "uAlphaColor");
 
 var pickerPositionBuffer = createBufferFromArray(new Float32Array([
-    0.5, -0.5, -0.5, -0.5, -0.5, -0.5,
-    -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,
      0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
     -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
-    -0.5, -0.5,  0.5, -0.5, -0.5, -0.5,
-    -0.5,  0.5, -0.5, -0.5,  0.5,  0.5,
-     0.5, -0.5, -0.5,  0.5, -0.5,  0.5,
-     0.5,  0.5,  0.5,  0.5,  0.5, -0.5,
-    -0.5, -0.5, -0.5,  0.5, -0.5, -0.5,
-     0.5,  0.5, -0.5, -0.5,  0.5, -0.5,
-     0.5, -0.5,  0.5, -0.5, -0.5,  0.5,
-    -0.5,  0.5,  0.5,  0.5,  0.5,  0.5
 ]), gl.ARRAY_BUFFER);
 
 var pickerIndexbuffer = createBufferFromArray(new Uint32Array(
-    [ 0, 1, 2, 0, 2, 3,
-        4, 5, 6, 4, 6, 7,
-        8, 9, 10, 8, 10, 11, 
-        12, 13, 14, 12, 14, 15, 
-        16, 17, 18, 16, 18, 19, 
-        20, 21, 22, 20, 22, 23]
+    [ 0, 2, 1, 0, 3, 2]
 ), gl.ELEMENT_ARRAY_BUFFER);
 
 var pickerColorBuffer = createBufferFromArray(new Uint8Array([  
-    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
-    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
-    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
-    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
-    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,  
-    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  
 ]), gl.ARRAY_BUFFER);
 
 /*======== Setting Crossahir attributes =====*/
@@ -238,10 +218,10 @@ gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
-let mat = []
+
 const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {positionMatrices:matrices, textureMatrices: textureMatrices}, countInstances);
 world.generateChunks();
-mat,countInstances = world.generateAllMeshes();
+countInstances = world.generateAllMeshes();
 
 console.log("Number of instances:", countInstances)
 
@@ -268,63 +248,11 @@ image.addEventListener('load', function() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 });
 
-/*==================== MATRIX ====================== */
-
-function get_projection(fov, a, zMin, zMax) {
-   var ang = degToRad(fov) // Math.tan((fov*.5)*Math.PI/180); 
-   return [
-      1/ang, 0 , 0, 0,
-      0, a/ang, 0, 0,
-      0, 0, -(zMax+zMin)/(zMax-zMin), -1,
-      0, 0, (-2*zMax*zMin)/(zMax-zMin), 0 
-   ];
-}
-
-/*================= Mouse events ======================*/
+/*================= Mouse and Player ======================*/
 
 const mousePos = {x: 0, y: 0}
 
-let yaw = 0;   // Horizontal angle (yaw)
-let pitch = 0; // Vertical angle (pitch)
-
-document.addEventListener('mousemove', e => {
-   if (document.pointerLockElement === canvas){
-      // pos is in pixel coordinates for the canvas.
-      // so convert to WebGL clip space coordinates
-      mousePos.x = (((mousePos.x+1)/2) + e.movementX / gl.canvas.width)  *  2 - 1;
-      mousePos.y = (((mousePos.y-1)/-2) + e.movementY / gl.canvas.height)  *  -2 + 1;
-   }
-   mousePos.y = Math.min(Math.max(-0.999, mousePos.y), 0.999);
-   // console.log(mousePos.x, mousePos.y)
-   yaw = mousePos.x * Math.PI / 2     
-   pitch = -mousePos.y * Math.PI / 2 
-});
-
-let blockType = 3;
-document.addEventListener("wheel", e => {
-
-   blockType = 1 + ((blockType += e.deltaY >= 0? 1: -1 )% typesOfBlocks + typesOfBlocks -1) % typesOfBlocks; //    console.log(e.deltaY)
-
-//    obj.FOV = Math.min(Math.max(10, obj.FOV + e.deltaY * 0.05), 120);
-   FOV.updateDisplay()
-}, { passive: false });
-
-let blockSelected = false;
-let breakBlock = false;
-let placeBlock = false;
-
-document.addEventListener("mouseup", e => {canvas.requestPointerLock();
-    // console.log(e.button);
-    if (blockSelected){
-        if (e.button == 0){
-            breakBlock = true;
-        }
-        else if (e.button == 2){
-            placeBlock = true;
-        }
-    }
-});
-document.addEventListener("mouseout", e => {document.exitPointerLock();});
+const player = {pos: {x: chunkWidth/2, y:chunkHeight+1, z: chunkWidth/2}, yaw: 0, pitch: 0, blockType: 3, blockSelected: false, breakBlock: false, placeBlock: false}
 
 /*=================== Drawing =================== */
 
@@ -334,7 +262,7 @@ let renderSum = 0; // sum of render time for each frame
 var precentage = {precent: 0}
 var obj = {
     FPS: 0,
-    cameraPosition: {x: chunkWidth/2, y:chunkHeight+1, z: chunkWidth/2},
+    cameraPosition: player.pos,
     lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), ambient: 0.3, gamma: 1},
     FOV: 60,
     speed: 0.5,
@@ -438,13 +366,13 @@ var animate = function() {
     gl.uniform1f(uFogFar, obj.fogFar * obj.zMax);
 
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
-    var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, yaw, pitch);
-    mat, countInstances = world.renderChunks(Math.floor(obj.cameraPosition.x / chunkWidth), 
+    var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, player.yaw, player.pitch);
+    countInstances = world.renderChunks(Math.floor(obj.cameraPosition.x / chunkWidth), 
                                             Math.floor(obj.cameraPosition.z / chunkWidth))
     cameraPositionFolder.updateDisplay()
-    var target = [ cameraPositionArray[0] + Math.cos(pitch) * Math.cos(yaw),
-                    cameraPositionArray[1] - Math.sin(pitch),
-                    cameraPositionArray[2] - Math.cos(pitch) * Math.sin(-yaw)
+    var target = [ cameraPositionArray[0] + Math.cos(player.pitch) * Math.cos(player.yaw),
+                    cameraPositionArray[1] - Math.sin(player.pitch),
+                    cameraPositionArray[2] - Math.cos(player.pitch) * Math.sin(-player.yaw)
                     ];
 
     var up = [0, 1, 0];
@@ -493,30 +421,30 @@ var animate = function() {
             z: obj.cameraPosition.z
             }, 
         {
-            x: Math.cos(pitch) * Math.cos(yaw),
-            y: -Math.sin(pitch),
-            z: -Math.cos(pitch) * Math.sin(-yaw)
+            x: Math.cos(player.pitch) * Math.cos(player.yaw),
+            y: -Math.sin(player.pitch),
+            z: -Math.cos(player.pitch) * Math.sin(-player.yaw)
         }, 5)
     
     if(ray.hit){
         // console.log(ray);
-        blockSelected = true
-        drawPicker(time, ray.position, proj_matrix, view_matrix)
-        if(breakBlock){
-            mat,countInstances = world.removeBlock(ray.position.x, ray.position.y, ray.position.z);
+        player.blockSelected = true
+        drawPicker(time, ray.position, ray.normal, proj_matrix, view_matrix)
+        if(player.breakBlock){
+            countInstances = world.removeBlock(ray.position.x, ray.position.y, ray.position.z);
             // console.log("done", world.chunks, countInstances)
-            breakBlock = false;
+            player.breakBlock = false;
         }
-        if(placeBlock){
-            mat,countInstances = world.addBlock(ray.position.x + ray.normal.x,
+        if(player.placeBlock){
+            countInstances = world.addBlock(ray.position.x + ray.normal.x,
                                                 ray.position.y + ray.normal.y, 
                                                 ray.position.z + ray.normal.z,
-                                                blockType)
-            placeBlock = false;
+                                                player.blockType)
+            player.placeBlock = false;
         }
     }
     else{
-        blockSelected = false
+        player.blockSelected = false
     }
 
     if (isDebugOn()){
@@ -527,13 +455,13 @@ var animate = function() {
         gui.close();
     }
 
-    drawHandBlock(time, blockType);
+    drawHandBlock(time, player.blockType);
 
     window.requestAnimationFrame(animate);
 }
 animate(0);
 
-function drawPicker(time, pos, Pmatrix, Vmatrix){
+function drawPicker(time, pos, normal, Pmatrix, Vmatrix){
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -544,23 +472,42 @@ function drawPicker(time, pos, Pmatrix, Vmatrix){
     gl.enableVertexAttribArray(pickerPosition);
     gl.vertexAttribPointer(pickerPosition, 3, gl.FLOAT, false, 0, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, pickerColorBuffer);
-    gl.enableVertexAttribArray(pickerColor);
-    gl.vertexAttribPointer(pickerColor, 3, gl.UNSIGNED_BYTE, true, 0, 0);
-
     gl.uniformMatrix4fv(pickeruPmatrix, false, Pmatrix);
     gl.uniformMatrix4fv(pickeruVmatrix, false, Vmatrix);
-    gl.uniformMatrix4fv(pickeruMmatrix, false, [1,0,0,0,
-                                                0,1,0,0,
-                                                0,0,1,0,
-                                                pos.x + 0.5,pos.y+ 0.5,pos.z+ 0.5,1
-                                            ]);
+
+    const mMatrix = [1,0,0,0,
+                    0,1,0,0,
+                    0,0,1,0,
+                    pos.x + 0.5,pos.y+ 0.5,pos.z+ 0.5,1
+                ];
+
+    switch (`${normal.x},${normal.y},${normal.z}`) {
+        case '0,1,0': // top
+            break;
+        case '0,-1,0': // bottom
+            xRotate(mMatrix, -Math.PI, mMatrix);
+            break;
+        case '1,0,0': // right
+            zRotate(mMatrix, Math.PI / -2, mMatrix)
+            break;
+        case '-1,0,0': // left
+            zRotate(mMatrix, Math.PI / 2, mMatrix)
+            break;
+        case '0,0,1': // front
+            xRotate(mMatrix, Math.PI / 2, mMatrix)
+            break;
+        case '0,0,-1': // back
+            xRotate(mMatrix, Math.PI / -2, mMatrix)
+            break;
+    }
+
+    gl.uniformMatrix4fv(pickeruMmatrix, false, mMatrix);
                                             
-    gl.uniform1f(uAlphaColor, Math.sin(time*64) / 16 + 0.85);
+    gl.uniform1f(uAlphaColor, Math.sin(time*100) / 10 + 0.25);
     
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pickerIndexbuffer);
 
-    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, 0);
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
 }
 
 function drawCrosshair(){
@@ -577,8 +524,8 @@ function drawCrosshair(){
 
     var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     var matrix = get_projection(80, aspect, 0, 1);
-    matrix = xRotate(matrix, -pitch);
-    matrix = yRotate(matrix, -yaw);
+    matrix = xRotate(matrix, -player.pitch);
+    matrix = yRotate(matrix, -player.yaw);
 
     gl.uniformMatrix4fv(crosshairTransform, false, matrix);
 

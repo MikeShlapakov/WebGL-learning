@@ -371,6 +371,17 @@ function perspective(fieldOfViewInRadians, aspect, near, far, dst) {
   return dst;
 }
 
+
+function get_projection(fov, a, zMin, zMax) {
+  var ang = degToRad(fov) // Math.tan((fov*.5)*Math.PI/180); 
+  return [
+     1/ang, 0 , 0, 0,
+     0, a/ang, 0, 0,
+     0, 0, -(zMax+zMin)/(zMax-zMin), -1,
+     0, 0, (-2*zMax*zMin)/(zMax-zMin), 0 
+  ];
+}
+
 /**
  * Computes a 4-by-4 orthographic projection matrix given the coordinates of the
  * planes defining the axis-aligned, box-shaped viewing volume.  The matrix
