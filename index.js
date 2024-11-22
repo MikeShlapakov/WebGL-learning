@@ -272,6 +272,7 @@ var obj = {
     skyColor: [ 150, 220, 255 ], // RGB array
     fogNear: 0.75,
     fogFar: 1.0,
+    dayLightCycle: true,
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -298,15 +299,18 @@ gui.add(obj, 'zMin').min(0.01).max(10).step(0.05); // Increment amount
 gui.addColor(obj, 'skyColor'); // Increment amount
 gui.add(obj, 'fogNear').min(0).max(1).step(0.01); // Increment amount
 gui.add(obj, 'fogFar').min(0).max(1).step(0.01); // Increment amount
+gui.add(obj, 'dayLightCycle'); 
 
 // Sky color (sunrise to sunset)
+const dayLightCycle = 2*Math.PI;
 const skyColors = [
     { time: 0, color: [205, 204, 255] },      // Sunrise (yellow)
-    { time: 0.15, color: [150, 226, 255] }, // Day (blue)
-    { time: 0.85, color: [255, 165, 0] },   // Sunset (orange)
-    { time: 0.95, color: [200, 155, 250] }, // Sunset (pink)
-    { time: 1, color: [0, 0, 0] },          // Night (black)
-    { time: 1.1, color: [205, 204, 255] },
+    { time: Math.PI/4, color: [150, 226, 255] }, // Day (blue)
+    { time: 3*Math.PI/4, color: [245, 115, 25] },   // Sunset (orange)
+    { time: 9*Math.PI/10, color: [150, 100, 120] }, // Sunset (pink)
+    { time: Math.PI, color: [0, 0, 0] },          // Night (black)
+    { time: 1.75*Math.PI, color: [0, 0, 0] },          // Night (black)
+    { time: 2*Math.PI, color: [205, 204, 255] },
 ];
 
 var time = 0;
@@ -314,20 +318,22 @@ var time = 0;
 var animate = function() {
     let renderTime = performance.now();
 
-    time = (time + 0.001);
+    time = (time + 0.01);
 
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
     // gl.depthFunc(gl.LEQUAL);
     
-    var color = [150, 226, 255]
+    var color = obj.skyColor;
     // Update sky color based on time
-    for (let i = 0; i < skyColors.length - 1; i++) {
-        const current = skyColors[i];
-        const next = skyColors[i + 1];
-        if (time % 1.1 >= current.time && time % 1.1 <= next.time) {
-          const factor = (time % 1.1 - current.time) / (next.time - current.time);
-          color = interpolateColor(current.color, next.color, factor);
+    if (obj.dayLightCycle){
+        for (let i = 0; i < skyColors.length - 1; i++) {
+            const current = skyColors[i];
+            const next = skyColors[i + 1];
+            if (time % dayLightCycle >= current.time && time % dayLightCycle <= next.time) {
+            const factor = (time % dayLightCycle - current.time) / (next.time - current.time);
+            color = interpolateColor(current.color, next.color, factor);
+            }
         }
     }
 
@@ -388,12 +394,17 @@ var animate = function() {
     gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
-    gl.uniform3fv(uLightPosition, [ chunkWidth * chunksNum * (time % 1.1),
-                                    2 * chunkHeight * Math.sqrt(Math.max(Math.sin(time % 1.1*Math.PI), 0)),
-                                    chunkWidth * chunksNum * (time % 1.1)]);
-    // gl.uniform3fv(uLightPosition, [ obj.lightPosition.x,
-    //                                 obj.lightPosition.y,
-    //                                 obj.lightPosition.z]);
+    if (obj.dayLightCycle){
+        gl.uniform3fv(uLightPosition, [ chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2)),
+                                        2 * chunkHeight * Math.sin(time),
+                                        chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2))]);
+    }
+    else{
+        gl.uniform3fv(uLightPosition, [ obj.lightPosition.x,
+                                    obj.lightPosition.y,
+                                    obj.lightPosition.z]);
+    }
+
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
 
