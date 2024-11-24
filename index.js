@@ -252,7 +252,9 @@ image.addEventListener('load', function() {
 
 const mousePos = {x: 0, y: 0}
 
-const player = {pos: {x: chunkWidth/2, y:chunkHeight+1, z: chunkWidth/2}, yaw: 0, pitch: 0, blockType: 3, blockSelected: false, breakBlock: false, placeBlock: false}
+const player = {pos: {x: chunkWidth/2, y:chunkHeight+2, z: chunkWidth/2}, yaw: 0, pitch: 0,
+                blockType: 3, blockSelected: false, breakBlock: false, placeBlock: false,
+                hitbox: {width: 0.4, height: 1.75}}
 
 /*=================== Drawing =================== */
 
@@ -263,9 +265,9 @@ var precentage = {precent: 0}
 var obj = {
     FPS: 0,
     cameraPosition: player.pos,
-    lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), ambient: 0.3, gamma: 1},
+    lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), ambient: 0.3, gamma: 1.22},
     FOV: 60,
-    speed: 0.5,
+    speed: 0.1,
     // rotationSpeed: 0.02, // Speed of rotation
     zMax: Math.max(10, chunkWidth*chunksNum),
     zMin: 0.25,
@@ -273,6 +275,7 @@ var obj = {
     fogNear: 0.75,
     fogFar: 1.0,
     dayLightCycle: true,
+    flying: false,
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -300,6 +303,7 @@ gui.addColor(obj, 'skyColor'); // Increment amount
 gui.add(obj, 'fogNear').min(0).max(1).step(0.01); // Increment amount
 gui.add(obj, 'fogFar').min(0).max(1).step(0.01); // Increment amount
 gui.add(obj, 'dayLightCycle'); 
+gui.add(obj, 'flying'); 
 
 // Sky color (sunrise to sunset)
 const dayLightCycle = 2*Math.PI;
@@ -314,11 +318,20 @@ const skyColors = [
 ];
 
 var time = 0;
+const dt = 0.001;
+const gravity = 7;
+let y_speed = 0;
+let onTheGround = true;
 
 var animate = function() {
     let renderTime = performance.now();
 
-    time = (time + 0.01);
+    time += dt;
+    if (!obj.flying){
+        y_speed += gravity * dt;
+        player.pos.y -= y_speed;
+        detectCollision(world, player, [0, -1, 0])
+    }
 
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
@@ -372,9 +385,9 @@ var animate = function() {
     gl.uniform1f(uFogFar, obj.fogFar * obj.zMax);
 
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
-    var cameraPositionArray = calculateCameraPos(obj.cameraPosition, obj.speed, player.yaw, player.pitch);
-    countInstances = world.renderChunks(Math.floor(obj.cameraPosition.x / chunkWidth), 
-                                            Math.floor(obj.cameraPosition.z / chunkWidth))
+    var cameraPositionArray = calculateCameraPos(player.pos, obj.speed, player.yaw, player.pitch);
+    countInstances = world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
+                                            Math.floor(player.pos.z / chunkWidth))    
     cameraPositionFolder.updateDisplay()
     var target = [ cameraPositionArray[0] + Math.cos(player.pitch) * Math.cos(player.yaw),
                     cameraPositionArray[1] - Math.sin(player.pitch),
