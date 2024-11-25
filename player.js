@@ -85,7 +85,7 @@ function calculateCameraPos(cameraPos, speed, yaw, pitch){
         // console.log( normal )
         cameraPos.x += speed * normal[0];
         if (!obj.flying){
-            if (onTheGround && normal[1]){
+            if (onTheGround && normal[1] == 1){
                 y_speed = -0.15; 
                 onTheGround = false;
             }
@@ -136,7 +136,7 @@ function resolveCollision(candidates, player, normal) {
         if (
             block.x - 0.5 <= (player.pos.x + player.hitbox.width) &&
             block.x + 0.5 >= (player.pos.x - player.hitbox.width) &&
-            block.y - 0.5 <= (player.pos.y + 0.5) &&
+            block.y - 0.5 <= (player.pos.y + 0.1) &&
             block.y + 0.5 >= (player.pos.y - player.hitbox.height) &&
             block.z - 0.5 <= (player.pos.z + player.hitbox.width) &&
             block.z + 0.5 >= (player.pos.z - player.hitbox.width)
@@ -147,7 +147,7 @@ function resolveCollision(candidates, player, normal) {
             );
 
             const overlapY = Math.min(
-                (player.pos.y + 0.5) - (block.y - 0.5),
+                (player.pos.y + 0.1) - (block.y - 0.5),
                 (block.y + 0.5) - (player.pos.y - player.hitbox.height)
             );
 
@@ -157,18 +157,23 @@ function resolveCollision(candidates, player, normal) {
             );
 
             // console.log(block, Math.abs(normal[0]) > Math.abs(normal[2]), Math.abs(normal[0]) , Math.abs(normal[2]))
+            
             // console.log(normal, overlapX, overlapZ)
+            // if(!Math.abs(normal[1])){
+            //     // console.log(normal)
+            // }
             if (Math.abs(normal[1])) {
+                // console.log(normal)
                 player.pos.y -= Math.sign(normal[1]) * overlapY;
                 y_speed = 0;
                 onTheGround = true;
             }
             // Resolve collision in the direction of the normal
             else if (Math.abs(normal[0]) > Math.abs(normal[2])) {
-                player.pos.x -= Math.sign(normal[0]) * overlapX;
+                player.pos.x -= Math.sign(normal[0]) * (overlapX*1.01);
             }
             else if (Math.abs(normal[2]) > Math.abs(normal[0])) {
-                player.pos.z -= Math.sign(normal[2]) * overlapZ;
+                player.pos.z -= Math.sign(normal[2]) * (overlapZ*1.01);
             }
 
             // // Handle cases where the collision is not perfectly aligned with any axis

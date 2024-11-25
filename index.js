@@ -254,7 +254,7 @@ const mousePos = {x: 0, y: 0}
 
 const player = {pos: {x: chunkWidth/2, y:chunkHeight+2, z: chunkWidth/2}, yaw: 0, pitch: 0,
                 blockType: 3, blockSelected: false, breakBlock: false, placeBlock: false,
-                hitbox: {width: 0.4, height: 1.75}}
+                hitbox: {width: 0.4, height: 1.65}}
 
 /*=================== Drawing =================== */
 
@@ -486,7 +486,6 @@ var animate = function() {
 animate(0);
 
 function drawPicker(time, pos, normal, Pmatrix, Vmatrix){
-    gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -502,7 +501,10 @@ function drawPicker(time, pos, normal, Pmatrix, Vmatrix){
     const mMatrix = [1,0,0,0,
                     0,1,0,0,
                     0,0,1,0,
-                    pos.x + 0.5,pos.y+ 0.5,pos.z+ 0.5,1
+                    pos.x + 0.5 + 0.0001 * normal.x,
+                    pos.y + 0.5 + 0.0001 * normal.y,
+                    pos.z + 0.5 + 0.0001 * normal.z,
+                    1
                 ];
 
     switch (`${normal.x},${normal.y},${normal.z}`) {
