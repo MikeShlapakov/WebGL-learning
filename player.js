@@ -22,6 +22,11 @@ document.addEventListener('mousemove', e => {
     // console.log(mousePos.x, mousePos.y)
     player.yaw = mousePos.x * Math.PI / 2     
     player.pitch = -mousePos.y * Math.PI / 2 
+    // console.log(player.pitch)
+    obj.cameraDirection.x = Math.cos(player.yaw);
+    obj.cameraDirection.y = mousePos.y;
+    obj.cameraDirection.z = Math.sin(player.yaw);
+    cameraDirectionFolder.updateDisplay()
 });
 
 document.addEventListener("wheel", e => {
@@ -47,11 +52,11 @@ document.addEventListener("mouseout", e => {document.exitPointerLock();});
 function calculateCameraPos(cameraPos, speed, yaw, pitch){
     let normal = [0,0,0];
     if (keys['w']) // Move forward
-    normal = addVectors(normal, normalize([
-            Math.cos(yaw),
-            0,
-            Math.sin(yaw)
-        ]));
+        normal = addVectors(normal, normalize([
+                Math.cos(yaw),
+                0,
+                Math.sin(yaw)
+            ]));
 
     if (keys['s'])  // Move backward
         normal = addVectors(normal, normalize([
@@ -156,56 +161,18 @@ function resolveCollision(candidates, player, normal) {
                 (block.z + 0.5) - (player.pos.z - player.hitbox.width)
             );
 
-            // console.log(block, Math.abs(normal[0]) > Math.abs(normal[2]), Math.abs(normal[0]) , Math.abs(normal[2]))
-            
-            // console.log(normal, overlapX, overlapZ)
-            // if(!Math.abs(normal[1])){
-            //     // console.log(normal)
-            // }
-            if (Math.abs(normal[1])) {
-                // console.log(normal)
-                player.pos.y -= Math.sign(normal[1]) * overlapY;
+            // Resolve collision in the direction of the normal
+            if (overlapY <= overlapX && overlapY <= overlapZ) {
+                player.pos.y -= Math.sign(normal[1]) * (overlapY*1.1);
                 y_speed = 0;
                 onTheGround = true;
             }
-            // Resolve collision in the direction of the normal
-            else if (Math.abs(normal[0]) > Math.abs(normal[2])) {
-                player.pos.x -= Math.sign(normal[0]) * (overlapX*1.01);
+            else if (overlapX < overlapZ) {
+                player.pos.x -= Math.sign(normal[0]) * (overlapX*1.1);
             }
-            else if (Math.abs(normal[2]) > Math.abs(normal[0])) {
-                player.pos.z -= Math.sign(normal[2]) * (overlapZ*1.01);
+            else if (overlapX > overlapZ) {
+                player.pos.z -= Math.sign(normal[2]) * (overlapZ*1.1);
             }
-
-            // // Handle cases where the collision is not perfectly aligned with any axis
-            // // and resolve multiple axis collisions (corner cases)
-            // if (normal[0] !== 0 && normal[2] !== 0) {
-            //     // If both X and Z are non-zero, handle diagonal corner collisions
-            //     // Apply the smallest overlap in both directions
-            //     const smallestOverlap = Math.min(overlapX, overlapZ);
-            //     if (overlapX <= overlapZ) {
-            //         player.pos.x -= Math.sign(normal[0]) * smallestOverlap;
-            //     } else {
-            //         player.pos.z -= Math.sign(normal[2]) * smallestOverlap;
-            //     }
-            // }
-            // else if (normal[0] !== 0 && normal[1] !== 0) {
-            //     // If both X and Y are non-zero
-            //     const smallestOverlap = Math.min(overlapX, overlapY);
-            //     if (overlapX <= overlapY) {
-            //         player.pos.x -= Math.sign(normal[0]) * smallestOverlap;
-            //     } else {
-            //         player.pos.y -= Math.sign(normal[1]) * smallestOverlap;
-            //     }
-            // }
-            // else if (normal[2] !== 0 && normal[1] !== 0) {
-            //     // If both Z and Y are non-zero
-            //     const smallestOverlap = Math.min(overlapZ, overlapY);
-            //     if (overlapZ <= overlapY) {
-            //         player.pos.z -= Math.sign(normal[2]) * smallestOverlap;
-            //     } else {
-            //         player.pos.y -= Math.sign(normal[1]) * smallestOverlap;
-            //     }
-            // }
         }
     }
 }

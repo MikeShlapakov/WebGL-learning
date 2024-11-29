@@ -1,5 +1,5 @@
 class World {
-    constructor(chunkSize, renderDist, matrices, countInstances, worldParams = {seed: 123, terrain: {scale:30,offset: 0,magnitude: 1}}) {
+    constructor(chunkSize, renderDist, matrices, countInstances, worldParams = {seed: 123, terrain: {scale:20,offset: 0,magnitude: 0.4}}) {
         this.chunkSize = chunkSize;
         this.renderDist = renderDist;
         this.matrices = matrices;

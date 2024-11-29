@@ -16,7 +16,7 @@ canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
 const chunkWidth = 16;
-const chunkHeight = 16;
+const chunkHeight = 32;
 const chunksNum = 4;
 const renderDistance = chunksNum - 1
 
@@ -265,6 +265,7 @@ var precentage = {precent: 0}
 var obj = {
     FPS: 0,
     cameraPosition: player.pos,
+    cameraDirection: {x: 0, y: 0, z: 0},
     lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), ambient: 0.3, gamma: 1.22},
     FOV: 60,
     speed: 0.1,
@@ -275,7 +276,7 @@ var obj = {
     fogNear: 0.75,
     fogFar: 1.0,
     dayLightCycle: true,
-    flying: false,
+    flying: true,
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -284,10 +285,15 @@ gui.domElement.id = 'gui';
 // var perc = gui.add(precentage, 'precent')
 var FPS = gui.add(obj, 'FPS')
 var cameraPositionFolder = gui.addFolder('Camera Position')
-cameraPositionFolder.add(obj.cameraPosition, 'x')
-cameraPositionFolder.add(obj.cameraPosition, 'y')
-cameraPositionFolder.add(obj.cameraPosition, 'z')
+cameraPositionFolder.add(obj.cameraPosition, 'x').step(0.1);
+cameraPositionFolder.add(obj.cameraPosition, 'y').step(0.1);
+cameraPositionFolder.add(obj.cameraPosition, 'z').step(0.1);
 cameraPositionFolder.open()
+var cameraDirectionFolder = gui.addFolder('Camera Direction')
+cameraDirectionFolder.add(obj.cameraDirection, 'x').step(0.001);
+cameraDirectionFolder.add(obj.cameraDirection, 'y').step(0.001);
+cameraDirectionFolder.add(obj.cameraDirection, 'z').step(0.001);
+cameraDirectionFolder.open()
 var lightPositionFolder = gui.addFolder('Light Position')
 lightPositionFolder.add(obj.lightPosition, 'x').min(-chunkWidth*chunksNum*2).max(chunkWidth*chunksNum*2).step(1);
 lightPositionFolder.add(obj.lightPosition, 'y').min(-chunkHeight*2).max(chunkHeight*2).step(1);
@@ -321,6 +327,7 @@ var time = 0;
 const dt = 0.001;
 const gravity = 7;
 let y_speed = 0;
+let max_y_velocity = 0.3;
 let onTheGround = true;
 
 var animate = function() {
@@ -328,7 +335,7 @@ var animate = function() {
 
     time += dt;
     if (!obj.flying){
-        y_speed += gravity * dt;
+        y_speed = Math.min(max_y_velocity, y_speed + gravity * dt);
         player.pos.y -= y_speed;
         detectCollision(world, player, [0, -1, 0])
     }
@@ -408,9 +415,9 @@ var animate = function() {
     gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
     if (obj.dayLightCycle){
-        gl.uniform3fv(uLightPosition, [ chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2)),
+        gl.uniform3fv(uLightPosition, [ player.pos.x - chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2)),
                                         2 * chunkHeight * Math.sin(time),
-                                        chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2))]);
+                                        player.pos.z - chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2))]);
     }
     else{
         gl.uniform3fv(uLightPosition, [ obj.lightPosition.x,

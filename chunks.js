@@ -103,10 +103,23 @@ class Chunk {
 
                 for (let y = 0; y <= this.size.height; y++) {
                     if (y < h) {
-                        this.setBlockId(x, y, z, 2); // Interior block
+                        if(y < 4){
+                            this.setBlockId(x, y, z, 3); 
+                        }
+                        else{
+                            this.setBlockId(x, y, z, 2); // Surface block
+                        }
                     } else if (y === h) {
-                        this.setBlockId(x, y, z, 1); // Surface block
+                        if (y == 4) {
+                            this.setBlockId(x, y, z, 4); // Interior block
+                        }else if(y < 4){
+                            this.setBlockId(x, y, z, 3); 
+                        }
+                        else{
+                            this.setBlockId(x, y, z, 1); // Surface block
+                        }
                     }
+                    
                 }
             }
         }
