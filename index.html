@@ -195,5 +195,34 @@
             }
         </script>
 
+        <script id="clouds-vertex-shader" type="x-shader/x-vertex">
+            attribute vec4 aPosition;
+            
+            attribute vec2 aTextCoord;
+            
+            uniform mat4 uPmatrix;
+            uniform mat4 uVmatrix;
+            uniform mat4 uMmatrix;
+            
+            varying vec2 vTextCoord;
+            
+            void main() {
+              gl_Position =  uPmatrix * uVmatrix *uMmatrix* aPosition;
+    
+              vTextCoord = aTextCoord;
+            }
+        </script>
+
+        <script id="clouds-fragment-shader" type="x-shader/x-fragment">
+            precision mediump float;
+            
+            uniform sampler2D uTexture;
+            varying vec2 vTextCoord;
+            
+            void main() {
+                gl_FragColor = texture2D(uTexture, vTextCoord)* vec4(1, 1, 1, 0.2);
+            }
+        </script>
+
         <script src="./index.js"></script>
 </html>

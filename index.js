@@ -15,9 +15,9 @@ gl.getExtension("OES_element_index_uint");
 canvas.width = window.innerWidth * window.devicePixelRatio || 1
 canvas.height = window.innerHeight * window.devicePixelRatio || 1
 
-const chunkWidth = 16;
+const chunkWidth = 32;
 const chunkHeight = 32;
-const chunksNum = 4;
+const chunksNum = 3;
 const renderDistance = chunksNum - 1
 
 const typesOfBlocks = 5
@@ -83,6 +83,9 @@ const crosshairProgram = createProgramFromSource(gl, {vertexShader:"crosshair-ve
 
 const handBlockProgram = createProgramFromSource(gl, {vertexShader:"hand-block-vertex-shader",
                                                     fragmentShader:"hand-block-fragment-shader"})
+
+const cloudsProgram = createProgramFromSource(gl, {vertexShader:"clouds-vertex-shader",
+                                                    fragmentShader:"clouds-fragment-shader"})
 
 /*======== Associating attributes to vertex shader =====*/
 var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
@@ -193,6 +196,24 @@ var handBlockIndexbuffer = createBufferFromArray(new Uint32Array(
         20, 21, 22, 20, 22, 23]
 ), gl.ELEMENT_ARRAY_BUFFER);
 
+
+/*======== Setting Clouds attributes =====*/
+
+var cloudsPosition = gl.getAttribLocation(cloudsProgram, "aPosition");
+var cloudsPmatrix = gl.getUniformLocation(cloudsProgram, "uPmatrix");
+var cloudsVmatrix = gl.getUniformLocation(cloudsProgram, "uVmatrix");
+var cloudsMmatrix = gl.getUniformLocation(cloudsProgram, "uMmatrix");
+
+var cloudsPositionBuffer = createBufferFromArray(new Float32Array([
+     0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
+    -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
+]), gl.ARRAY_BUFFER);
+
+var cloudsIndexbuffer = createBufferFromArray(new Uint32Array(
+    [ 0, 1, 2, 0, 2, 3]
+), gl.ELEMENT_ARRAY_BUFFER);
+
+
 /*========== Defining and storing the geometry ==========*/
 
 // setup matrices, one per instance
@@ -227,8 +248,6 @@ console.log("Number of instances:", countInstances)
 
 // Create a texture.
 var texture = gl.createTexture();
-gl.activeTexture(gl.TEXTURE0);
-gl.bindTexture(gl.TEXTURE_2D, texture);
 
 // Fill the texture with a 1x1 blue pixel.
 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([50, 200, 75, 255]));
@@ -248,13 +267,29 @@ image.addEventListener('load', function() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 });
 
+var cloudsTexture = gl.createTexture();
+gl.activeTexture(gl.TEXTURE0);
+gl.bindTexture(gl.TEXTURE_2D, cloudsTexture);
+
+const cloudsImage = new Image();
+cloudsImage.src = "./textures/clouds.png";
+cloudsImage.addEventListener('load', function() {
+    // Now that the image has loaded make copy it to the texture.
+    gl.bindTexture(gl.TEXTURE_2D, cloudsTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cloudsImage);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+});
+
 /*================= Mouse and Player ======================*/
 
 const mousePos = {x: 0, y: 0}
 
 const player = {pos: {x: chunkWidth/2, y:chunkHeight+2, z: chunkWidth/2}, yaw: 0, pitch: 0,
                 blockType: 3, blockSelected: false, breakBlock: false, placeBlock: false,
-                hitbox: {width: 0.4, height: 1.65}}
+                hitbox: {width: 0.3, height: 1.65}}
 
 /*=================== Drawing =================== */
 
@@ -276,7 +311,8 @@ var obj = {
     fogNear: 0.75,
     fogFar: 1.0,
     dayLightCycle: true,
-    flying: true,
+    flying: false,
+    collision: true
 };
 
 var gui = new dat.gui.GUI({ autoPlace: true });
@@ -310,6 +346,7 @@ gui.add(obj, 'fogNear').min(0).max(1).step(0.01); // Increment amount
 gui.add(obj, 'fogFar').min(0).max(1).step(0.01); // Increment amount
 gui.add(obj, 'dayLightCycle'); 
 gui.add(obj, 'flying'); 
+gui.add(obj, 'collision'); 
 
 // Sky color (sunrise to sunset)
 const dayLightCycle = 2*Math.PI;
@@ -337,7 +374,9 @@ var animate = function() {
     if (!obj.flying){
         y_speed = Math.min(max_y_velocity, y_speed + gravity * dt);
         player.pos.y -= y_speed;
-        detectCollision(world, player, [0, -1, 0])
+        if (obj.collision){
+            detectCollision(world, player, [0, -1, 0]);
+        }
     }
 
     gl.enable(gl.CULL_FACE);
@@ -360,6 +399,24 @@ var animate = function() {
     gl.clearColor(color[0]/255, color[1]/255, color[2]/255, 1);
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
+    var cameraPositionArray = calculateCameraPos(player.pos, obj.speed, player.yaw, player.pitch);
+    countInstances = world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
+                                            Math.floor(player.pos.z / chunkWidth))    
+    cameraPositionFolder.updateDisplay()
+    var target = [ cameraPositionArray[0] + Math.cos(player.pitch) * Math.cos(player.yaw),
+                    cameraPositionArray[1] - Math.sin(player.pitch),
+                    cameraPositionArray[2] - Math.cos(player.pitch) * Math.sin(-player.yaw)
+                    ];
+
+    var up = [0, 1, 0];
+    var cameraMatrix = lookAt(cameraPositionArray, target, up);
+
+    // Make a view matrix from the camera matrix.
+    var view_matrix = inverse(cameraMatrix);
+
+    drawClouds(time, proj_matrix, view_matrix);
 
     gl.useProgram(mainProgram);
 
@@ -374,6 +431,8 @@ var animate = function() {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
     setMatrixAttributes(gl, aMmatrix, 4, gl.FLOAT);
 
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     // Upload the texture matrix data
     gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
@@ -390,22 +449,6 @@ var animate = function() {
     gl.uniform4fv(uFogColor, [color[0]/255, color[1]/255, color[2]/255, 1]);
     gl.uniform1f(uFogNear, obj.fogNear * obj.zMax);
     gl.uniform1f(uFogFar, obj.fogFar * obj.zMax);
-
-    var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
-    var cameraPositionArray = calculateCameraPos(player.pos, obj.speed, player.yaw, player.pitch);
-    countInstances = world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
-                                            Math.floor(player.pos.z / chunkWidth))    
-    cameraPositionFolder.updateDisplay()
-    var target = [ cameraPositionArray[0] + Math.cos(player.pitch) * Math.cos(player.yaw),
-                    cameraPositionArray[1] - Math.sin(player.pitch),
-                    cameraPositionArray[2] - Math.cos(player.pitch) * Math.sin(-player.yaw)
-                    ];
-
-    var up = [0, 1, 0];
-    var cameraMatrix = lookAt(cameraPositionArray, target, up);
-
-    // Make a view matrix from the camera matrix.
-    var view_matrix = inverse(cameraMatrix);
 
     gl.uniformMatrix4fv(uPmatrix, false, proj_matrix);
     gl.uniformMatrix4fv(uVmatrix, false, view_matrix);
@@ -606,4 +649,51 @@ function drawHandBlock(time, blockType){
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, handBlockIndexbuffer);
 
     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, 0);
+}
+
+function drawClouds(time, Pmatrix, Vmatrix){
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+
+    gl.useProgram(cloudsProgram);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, cloudsPositionBuffer);
+    gl.enableVertexAttribArray(cloudsPosition);
+    gl.vertexAttribPointer(cloudsPosition, 3, gl.FLOAT, false, 0, 0);
+
+    gl.uniformMatrix4fv(cloudsPmatrix, false, Pmatrix);
+    gl.uniformMatrix4fv(cloudsVmatrix, false, Vmatrix);
+
+    // console.log(Pmatrix, Vmatrix)
+
+    const w = 2*textureSize/cloudsImage.width;
+    const h = 2*textureSize/cloudsImage.height;
+    const cloudsSpeed = 0.25
+    const textureCoords = [w, cloudsSpeed*time * h, 0, cloudsSpeed*time * h, 0, (cloudsSpeed*time - 1) * h, w, (cloudsSpeed*time - 1) * h];
+    
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, cloudsTexture);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+    var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+    gl.enableVertexAttribArray(aTexture);
+    gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 0, 0);
+
+    const mMatrix = [3*obj.zMax,0,0,0,
+                     0,1,0,0,
+                     0,0,3*obj.zMax,0,
+                     player.pos.x,
+                     chunkHeight + player.hitbox.height + 1,
+                     player.pos.z,
+                     1
+                    ];
+
+    gl.uniformMatrix4fv(cloudsMmatrix, false, mMatrix);                       
+    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cloudsIndexbuffer);
+
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
 }

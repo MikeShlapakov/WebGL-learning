@@ -87,18 +87,47 @@ function calculateCameraPos(cameraPos, speed, yaw, pitch){
     
     
     if (!compareArrays(normal, [0, 0, 0])){
-        // console.log( normal )
-        cameraPos.x += speed * normal[0];
-        if (!obj.flying){
-            if (onTheGround && normal[1] == 1){
-                y_speed = -0.15; 
+
+        player.pos.x += speed * normal[0];
+        player.pos.z += speed * normal[2];
+
+        if(obj.collision){
+            detectCollision(world, player, normal)
+        }
+
+        if (normal[1] != 0){
+            if (obj.flying){
+                player.pos.y += speed * normal[1];
+                // if(obj.collision){
+                //     detectCollision(world, player, normal)
+                // }
+            }
+            else if (onTheGround && normal[1] == 1){
+                y_speed = -0.15;
                 onTheGround = false;
             }
-        }else{
-            cameraPos.y += speed * normal[1];
+
+            // return [player.pos.x, player.pos.y, player.pos.z];
         }
-        cameraPos.z += speed * normal[2];
-        detectCollision(world, player, normal)
+
+        if(obj.collision){
+            detectCollision(world, player, normal)
+        }
+        // // console.log( normal )
+        // cameraPos.x += speed * normal[0];
+        // // if (!obj.flying){
+        // //     if (onTheGround && normal[1] == 1){
+        // //         y_speed = -0.15; 
+        // //         onTheGround = false;
+        // //     }
+        // // }else{
+        // //     cameraPos.y += speed * normal[1];
+        // // }
+        // cameraPos.z += speed * normal[2];
+        // if(obj.collision){
+        //     detectCollision(world, player, normal)
+        // }
+        
     }
 
     return [cameraPos.x, cameraPos.y, cameraPos.z];
@@ -141,7 +170,7 @@ function resolveCollision(candidates, player, normal) {
         if (
             block.x - 0.5 <= (player.pos.x + player.hitbox.width) &&
             block.x + 0.5 >= (player.pos.x - player.hitbox.width) &&
-            block.y - 0.5 <= (player.pos.y + 0.1) &&
+            block.y - 0.5 <= (player.pos.y + 0.3) &&
             block.y + 0.5 >= (player.pos.y - player.hitbox.height) &&
             block.z - 0.5 <= (player.pos.z + player.hitbox.width) &&
             block.z + 0.5 >= (player.pos.z - player.hitbox.width)

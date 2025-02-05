@@ -72,6 +72,10 @@ class World {
         chunk.instanceCount--;
         const pos = chunk.getBlockPositionByInstance(chunk.instanceCount);
 
+        if (pos == null){
+            return this.countInstances;
+        }
+        
         chunk.setBlockInstanceId(pos.x, pos.y, pos.z, this.getBlock(x, y, z).instanceId);
 
         // remove the broken block from the instances
