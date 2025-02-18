@@ -47,10 +47,10 @@ class Mesh {
 
     setNormalMatrix(index, value) {
         if (this.isValidIndex(index)) {
-            if (value.length === 16) {
+            if (value.length === 3) {
                 this.normalMatrix[index] = value;
             } else {
-                throw new Error('Value must be of length 16');
+                throw new Error('Value must be of length 3');
             }
         }
     }

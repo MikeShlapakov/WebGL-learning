@@ -43,21 +43,25 @@ class World {
         let chunkStartIndex = 0;
         for (const chunk of this.chunks) {
             if(chunk.toGenerate){
-                chunk.generateMesh(chunk);
+                chunk.generateMesh();
                 chunk.toGenerate = false;
             }
             for (let i = 0; i < chunk.instanceCount; i++) {
-                if (chunk.mesh.getPositionMatrix(i) === null) break;
-                const positionMatrix = chunk.mesh.getPositionMatrix(i);
-                const textureMatrix = chunk.mesh.getTextureMatrix(i);
-                for (let j = 0; j < 16; ++j) {
-                    this.matrices.positionMatrices[chunkStartIndex + i][j] = positionMatrix[j];
-                }
-                for (let j = 0; j < 9; ++j) {
-                    this.matrices.textureMatrices[chunkStartIndex + i][j] = textureMatrix[j];
+                for (let face = 0; face < 6; face++){
+                    if (chunk.mesh[i].getPositionMatrix(face) === null) continue;
+                    const positionMatrix = chunk.mesh[i].getPositionMatrix(face);
+                    const normalMatrix = chunk.mesh[i].getNormalMatrix(face);
+                    const textureMatrix = chunk.mesh[i].getTextureMatrix(face);
+                    for (let j = 0; j < 16; ++j) {
+                        this.matrices.positionMatrices[chunkStartIndex][j] = positionMatrix[j];
+                        this.matrices.normalMatrices[chunkStartIndex][j] = normalMatrix[j]; 
+                    }
+                    for (let j = 0; j < 9; ++j) {
+                        this.matrices.textureMatrices[chunkStartIndex][j] = textureMatrix[j];
+                    }
+                    chunkStartIndex++;
                 }
             }
-            chunkStartIndex += chunk.instanceCount;
         }
         this.countInstances = chunkStartIndex;
         return this.countInstances;
@@ -76,6 +80,10 @@ class World {
             return this.countInstances;
         }
         
+        // reset the two instances
+        chunk.mesh[this.getBlock(x, y, z).instanceId] = new Mesh(6);
+        chunk.mesh[chunk.instanceCount] = new Mesh(6);
+
         chunk.setBlockInstanceId(pos.x, pos.y, pos.z, this.getBlock(x, y, z).instanceId);
 
         // remove the broken block from the instances

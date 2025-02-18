@@ -9,7 +9,11 @@ class Chunk {
 
         this.chunkGrid = this.initializeGrid();
 
-        this.mesh = new Mesh(chunkSize.width * chunkSize.height * chunkSize.width);
+        this.mesh = new Array(chunkSize.width * chunkSize.height * chunkSize.width);
+        for(let i = 0; i < this.mesh.length; i++){
+            this.mesh[i] = new Mesh(6);
+        }
+
         this.instanceCount = 0;
 
         this.toGenerate = true;
@@ -68,26 +72,29 @@ class Chunk {
         }
     }
 
-    isCubeVisible(x, y, z) {
+    isFaceVisible(x, y, z){
+        let visibleFaces = [];
+
         const block = this.getBlock(x, y, z);
         if (!block || block.id === 0) {
-            return false;
+            return visibleFaces;
         }
 
-        // console.log(world)
-        // Check all six faces
         const neighbors = [
+            world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
+            world.getBlock(this.position.x + x, y, this.position.z + z + 1), // Front
             world.getBlock(this.position.x + x - 1, y, this.position.z + z), // Left
             world.getBlock(this.position.x + x + 1, y, this.position.z + z), // Right
-            world.getBlock(this.position.x + x, y - 1, this.position.z + z), // Bottom
-            world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
             world.getBlock(this.position.x + x, y, this.position.z + z - 1), // Back
-            world.getBlock(this.position.x + x, y, this.position.z + z + 1)  // Front
+            world.getBlock(this.position.x + x, y - 1, this.position.z + z), // Bottom
         ];
 
-        for(let neighbor of neighbors){
-            if (neighbor && !neighbor.id) return true;
+        for(let i = 0; i < neighbors.length; i++){
+            if (neighbors[i] && neighbors[i].id == 0) {
+                visibleFaces.push(i);
+            };
         }
+        return visibleFaces;
     }
 
     generateTerrain() {
@@ -130,8 +137,9 @@ class Chunk {
         for(let x = 0; x < this.size.width; x++){
             for(let y = 0; y < this.size.height; y++){
                 for(let z = 0; z < this.size.width; z++){
+                    const faces = this.isFaceVisible(x, y, z);
 
-                    if (this.isCubeVisible(x, y, z)) {
+                    faces.forEach((face) => {
                         let instanceNum = this.getBlock(x, y, z).instanceId;
                         if(instanceNum == null){
                             this.setBlockInstanceId(x, y, z, this.instanceCount) 
@@ -139,12 +147,34 @@ class Chunk {
                             this.instanceCount++;
                         }
 
-                        this.mesh.setPositionMatrix(instanceNum, translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5));
-                        let textureMatrix = []
-                        textureMatrix = getTexturMatrix(0, (this.getBlock(x, y, z).id - 1)*textureSize, textureSize, textureSize, atlasWidth, atlasHeight)
-                        this.mesh.setTextureMatrix(instanceNum, textureMatrix)
+                        const positionMatrix = translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5);
+                        switch(face) {
+                            case 0: // top
+                                this.mesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI));
+                                break;
+                            case 1: 
+                                // front
+                                this.mesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI / -2));
+                                break;
+                            case 2: // left
+                                this.mesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / -2), Math.PI / -2));
+                                break;
+                            case 3: // right
+                                this.mesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / 2), Math.PI / 2));
+                                break;
+                            case 4: // back
+                                this.mesh[instanceNum].setPositionMatrix(face, yRotate(xRotate(positionMatrix, Math.PI / 2), Math.PI));
+                                break;
+                            case 5: 
+                                // bottom
+                                this.mesh[instanceNum].setPositionMatrix(face, positionMatrix);
+                                break;
+                        }
 
-                    }
+                        this.mesh[instanceNum].setTextureMatrix(face, getTexturMatrix(face*textureSize, (this.getBlock(x, y, z).id - 1)*textureSize, textureSize, textureSize, atlasWidth, atlasHeight))
+                        // this.mesh[instanceNum].setNormalMatrix(face, transpose(inverse(this.mesh[instanceNum].getPositionMatrix(face))))
+                        this.mesh[instanceNum].setNormalMatrix(face, normals[face])
+                    })   
                 }
             }
         }

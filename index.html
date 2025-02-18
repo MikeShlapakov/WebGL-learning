@@ -37,16 +37,14 @@
             attribute vec4 aColor;
             attribute vec2 aTextCoord;
             attribute mat3 aTextureMatrix;
-            uniform vec2 uTextureOffset;
 
             uniform mat4 uPmatrix;
             uniform mat4 uVmatrix;
-            uniform mat4 uFaceMatrix;
             attribute mat4 aMmatrix;
 
             varying vec3 vFogDepth;
 
-            uniform vec3 uNormal;
+            attribute vec3 aNormal;
 
             varying vec4 vWorldPosition;
             varying vec3 vNormal;
@@ -54,15 +52,15 @@
             varying vec2 vTextCoord;
 
             void main(void) { 
-                vWorldPosition = aMmatrix*uFaceMatrix*vec4(aPosition, 1.);
+                vWorldPosition = aMmatrix*vec4(aPosition, 1.);
 
                 gl_Position = uPmatrix*uVmatrix*vWorldPosition;
 
-                vNormal = uNormal;
+                vNormal = aNormal;
 
-                vTextCoord = (aTextureMatrix * vec3(aTextCoord + uTextureOffset, 1.)).xy;
+                vTextCoord = (aTextureMatrix * vec3(aTextCoord, 1.)).xy;
 
-                // vColor = vec4(abs(uNormal), 1.); // * aColor; // change this to see colors *.*
+                // vColor = vec4(abs(aNormal), 1.); // * aColor; // change this to see colors *.*
 
                 vFogDepth = (uVmatrix*vWorldPosition).xyz;
             }

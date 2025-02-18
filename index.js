@@ -35,35 +35,24 @@ let indices = [
     0, 2, 1, 0, 3, 2,
 ];
 
-var normals = [
-    // bottom
-    [0, -1, 0],
+const normals = [
     // top
     [0, 1, 0],
+    // front
+    [0, 0, 1],
     // left
     [-1, 0, 0],
     // right
     [1, 0, 0],
     // back
     [0, 0, -1],
-    // front
-    [0, 0, 1]
+    // bottom
+    [0, -1, 0],
 ];
 
 let textureCoords = [
     1, 1, 0, 1, 0, 0, 1, 0,
 ]
-
-let textureOffsets = [[5,0], [0,0], [1,0], [2,0], [3,0], [4,0]]
-
-const faceMatrices = [
-    identity(),
-    xRotation(Math.PI),
-    yRotate(zRotation(Math.PI / -2), Math.PI / -2),
-    yRotate(zRotation(Math.PI / 2), Math.PI / 2),
-    yRotate(xRotation(Math.PI / 2), Math.PI ),
-    xRotation(Math.PI / -2),
-];
 
 let colors = [];
 
@@ -91,13 +80,11 @@ const cloudsProgram = createProgramFromSource(gl, {vertexShader:"clouds-vertex-s
 var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
 var uVmatrix = gl.getUniformLocation(mainProgram, "uVmatrix");
 var aMmatrix = gl.getAttribLocation(mainProgram, "aMmatrix");
-var uFaceMatrix = gl.getUniformLocation(mainProgram, "uFaceMatrix");
 
-var uNormal = gl.getUniformLocation(mainProgram, "uNormal");
+var aNormal = gl.getAttribLocation(mainProgram, "aNormal");
 
 var aTexture = gl.getAttribLocation(mainProgram, "aTextCoord");
 var aTextureMatrix = gl.getAttribLocation(mainProgram, "aTextureMatrix");
-var uTextureOffset = gl.getUniformLocation(mainProgram, "uTextureOffset");
 var uTexture = gl.getUniformLocation(mainProgram, "uTexture");
 
 var uAmbientLight = gl.getUniformLocation(mainProgram, "uAmbientLight");
@@ -205,19 +192,23 @@ var cloudsVmatrix = gl.getUniformLocation(cloudsProgram, "uVmatrix");
 var cloudsMmatrix = gl.getUniformLocation(cloudsProgram, "uMmatrix");
 
 var cloudsPositionBuffer = createBufferFromArray(new Float32Array([
-     0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
-    -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
+     1,  1,  1, -1,  1,  1, 
+    -1,  1, -1,  1,  1, -1,
+     1, -1, -1, -1, -1, -1,
+    -1, -1,  1,  1, -1,  1,
 ]), gl.ARRAY_BUFFER);
 
 var cloudsIndexbuffer = createBufferFromArray(new Uint32Array(
-    [ 0, 1, 2, 0, 2, 3]
+    [ 0, 1, 2, 0, 2, 3,
+        4, 6, 5, 4, 7, 6,
+    ]
 ), gl.ELEMENT_ARRAY_BUFFER);
 
 
 /*========== Defining and storing the geometry ==========*/
 
 // setup matrices, one per instance
-const numInstances = Math.min(chunkWidth*chunksNum*chunkHeight*chunkWidth*chunksNum, 2<<15);
+const numInstances = Math.min(chunkWidth*chunkHeight*chunkWidth*((2*chunksNum-1)**2)*6, 2<<15);
 console.log("Max Instances number:", numInstances)
 // make a typed array with one view per matrix
 const matrixData = new Float32Array(numInstances * 16);
@@ -228,6 +219,15 @@ for (let i = 0; i < numInstances; ++i) {
 const matrixBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
+
+const normalMatricesData = new Float32Array(numInstances * 3);
+const normalMatrices = [];
+for (let i = 0; i < numInstances; ++i) {
+    normalMatrices.push(new Float32Array(normalMatricesData.buffer, i * 3 * 4, 3));
+}
+const normalMatricesBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, normalMatricesBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, normalMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 const textureMatricesData = new Float32Array(numInstances * 9);
 const textureMatrices = [];
@@ -240,11 +240,11 @@ gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
 
-const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {positionMatrices:matrices, textureMatrices: textureMatrices}, countInstances);
+const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {positionMatrices:matrices, normalMatrices:normalMatrices, textureMatrices: textureMatrices}, countInstances);
 world.generateChunks();
 countInstances = world.generateAllMeshes();
 
-console.log("Number of instances:", countInstances)
+console.log("Number of instances:", countInstances) // before: 25647, after: 45153
 
 // Create a texture.
 var texture = gl.createTexture();
@@ -268,8 +268,6 @@ image.addEventListener('load', function() {
 });
 
 var cloudsTexture = gl.createTexture();
-gl.activeTexture(gl.TEXTURE0);
-gl.bindTexture(gl.TEXTURE_2D, cloudsTexture);
 
 const cloudsImage = new Image();
 cloudsImage.src = "./textures/clouds.png";
@@ -416,7 +414,7 @@ var animate = function() {
     // Make a view matrix from the camera matrix.
     var view_matrix = inverse(cameraMatrix);
 
-    drawClouds(time, proj_matrix, view_matrix);
+    drawClouds(time, get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, (chunksNum * 5)*chunkWidth), view_matrix);
 
     gl.useProgram(mainProgram);
 
@@ -430,6 +428,14 @@ var animate = function() {
     gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
     setMatrixAttributes(gl, aMmatrix, 4, gl.FLOAT);
+
+    // upload the normal matrix data
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalMatricesBuffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatricesData);
+    // setMatrixAttributes(gl, aNormal, 4, gl.FLOAT);
+    gl.enableVertexAttribArray(aNormal);
+    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0,0);
+    ext.vertexAttribDivisorANGLE(aNormal, 1);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -471,12 +477,7 @@ var animate = function() {
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
 
-    faceMatrices.forEach(function(faceMatrix, ndx) {
-        gl.uniform2fv(uTextureOffset, new Float32Array(textureOffsets[ndx]));
-        gl.uniform3fv(uNormal, new Float32Array(normals[ndx]));
-        gl.uniformMatrix4fv(uFaceMatrix, false, faceMatrix);
-        ext.drawElementsInstancedANGLE(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
-    });
+    ext.drawElementsInstancedANGLE(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
     
     renderSum += performance.now() - renderTime
     frameCount++;
@@ -665,11 +666,13 @@ function drawClouds(time, Pmatrix, Vmatrix){
     gl.uniformMatrix4fv(cloudsVmatrix, false, Vmatrix);
 
     // console.log(Pmatrix, Vmatrix)
+    const w = 4*textureSize/cloudsImage.width;
+    const h = 4*textureSize/cloudsImage.height;
+    const cloudsSpeed = 0.1
 
-    const w = 2*textureSize/cloudsImage.width;
-    const h = 2*textureSize/cloudsImage.height;
-    const cloudsSpeed = 0.25
-    const textureCoords = [w, cloudsSpeed*time * h, 0, cloudsSpeed*time * h, 0, (cloudsSpeed*time - 1) * h, w, (cloudsSpeed*time - 1) * h];
+    const textureCoords = [w, cloudsSpeed*time/2 * h, 0, cloudsSpeed*time/2 * h, 0, (cloudsSpeed*time/2 - 1) * h, w, (cloudsSpeed*time/2 - 1) * h,
+                            4*w, -cloudsSpeed*time * h, 3*w, -cloudsSpeed*time * h, 3*w, (-cloudsSpeed*time - 1) * h, 4*w, (-cloudsSpeed*time - 1) * h,
+                        ];
     
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, cloudsTexture);
@@ -682,11 +685,11 @@ function drawClouds(time, Pmatrix, Vmatrix){
     gl.enableVertexAttribArray(aTexture);
     gl.vertexAttribPointer(aTexture, 2, gl.FLOAT, false, 0, 0);
 
-    const mMatrix = [3*obj.zMax,0,0,0,
-                     0,1,0,0,
-                     0,0,3*obj.zMax,0,
+    const mMatrix = [(chunksNum * 5) * chunkWidth,0,0,0,
+                     0, 0.2*chunkHeight,0,0,
+                     0,0,(chunksNum * 5) * chunkWidth,0,
                      player.pos.x,
-                     chunkHeight + player.hitbox.height + 1,
+                     chunkHeight * 2,
                      player.pos.z,
                      1
                     ];
@@ -695,5 +698,5 @@ function drawClouds(time, Pmatrix, Vmatrix){
     
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cloudsIndexbuffer);
 
-    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
+    gl.drawElements(gl.TRIANGLES, 12, gl.UNSIGNED_INT, 0);
 }
