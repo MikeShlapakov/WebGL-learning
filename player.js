@@ -155,7 +155,7 @@ function detectCollision(world, player, normal){
         for (let y = hitbox.y.min; y <= hitbox.y.max; y++){
             for (let z = hitbox.z.min; z <= hitbox.z.max; z++){
                 const block = world.getBlock(x, y, z);
-                if (block && block.id != 0){
+                if (block){
                     collisions.push({x: x + 0.5, y: y + 0.5, z: z + 0.5});
                 }
             }

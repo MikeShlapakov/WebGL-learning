@@ -45,7 +45,7 @@ class World {
             if(chunk.toGenerate){
                 chunk.generateMesh();
                 chunk.toGenerate = false;
-            }
+            } 
             for (let i = 0; i < chunk.instanceCount; i++) {
                 for (let face = 0; face < 6; face++){
                     if (chunk.mesh[i].getPositionMatrix(face) === null) continue;
@@ -71,24 +71,11 @@ class World {
         // last instanced block is getting the instances number of the breaking block
         const chunk = this.getChunk(this.positionToChunk(x, y, z));
         chunk.toGenerate = true;
-        const skipInstances = chunk.instanceCount;
+ 
+        const localX = (x % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
+        const localZ = (z % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;       
 
-        chunk.instanceCount--;
-        const pos = chunk.getBlockPositionByInstance(chunk.instanceCount);
-
-        if (pos == null){
-            return this.countInstances;
-        }
-        
-        // reset the two instances
-        chunk.mesh[this.getBlock(x, y, z).instanceId] = new Mesh(6);
-        chunk.mesh[chunk.instanceCount] = new Mesh(6);
-
-        chunk.setBlockInstanceId(pos.x, pos.y, pos.z, this.getBlock(x, y, z).instanceId);
-
-        // remove the broken block from the instances
-        this.setBlockId(x, y, z, 0);
-        this.setBlockInstanceId(x, y, z, null);
+        chunk.deleteBlock(localX, y, localZ);
 
         const neighborChunks = [{x: x + 1, y, z: z},
                                 {x: x - 1, y, z: z},
@@ -111,10 +98,10 @@ class World {
         const chunk = this.getChunk(this.positionToChunk(x, y, z));
         if(!chunk) return this.countInstances;
 
-        this.setBlockId(x, y, z, blockType);
+        const localX = (x % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
+        const localZ = (z % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;       
 
-        this.setBlockInstanceId(x, y, z, chunk.instanceCount);
-        chunk.instanceCount++;
+        chunk.addBlock(localX, y, localZ, blockType);
 
         chunk.toGenerate = true;
         
@@ -124,7 +111,7 @@ class World {
     }
 
     renderChunks(chunkX, chunkZ){
-        const prevChuncks = this.chunks;
+        const prevChunks = this.chunks;
 
         const needToRender = []
         for (let x = -this.renderDist; x <= this.renderDist; x++) {
@@ -166,21 +153,19 @@ class World {
         for (let i = 0; i < chunksToGenerate.length; i += batchSize) {
             const batch = chunksToGenerate.slice(i, i + batchSize);
             
-            requestIdleCallback(() => {
-                batch.forEach(chunk => {
-                    chunk.generateMesh();
-                    chunk.toGenerate = false;
-                });
-            }, { timeout: 1000 });
+            batch.forEach(chunk => {
+                requestIdleCallback(chunk.generateMesh.bind(chunk), { timeout: 1000 });
+                // chunk.toGenerate = false;
+            });
         }
 
-        for (let chunk = 0; chunk < prevChuncks.length; chunk++) {
-            if (!this.chunks.includes(prevChuncks[chunk])){
+        for (let chunk = 0; chunk < prevChunks.length; chunk++) {
+            if (!this.chunks.includes(prevChunks[chunk])){
                 this.generateAllMeshes();
                 break;
             }
         }
-        
+
         return this.countInstances;
     }
 

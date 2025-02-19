@@ -208,7 +208,7 @@ var cloudsIndexbuffer = createBufferFromArray(new Uint32Array(
 /*========== Defining and storing the geometry ==========*/
 
 // setup matrices, one per instance
-const numInstances = Math.min(chunkWidth*chunkHeight*chunkWidth*((2*chunksNum-1)**2)*6, 2<<15);
+const numInstances = Math.min(chunkWidth*chunkHeight*chunkWidth*((2*chunksNum-1)**2)*6, 2<<16);
 console.log("Max Instances number:", numInstances)
 // make a typed array with one view per matrix
 const matrixData = new Float32Array(numInstances * 16);
@@ -401,7 +401,7 @@ var animate = function() {
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
     var cameraPositionArray = calculateCameraPos(player.pos, obj.speed, player.yaw, player.pitch);
     countInstances = world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
-                                            Math.floor(player.pos.z / chunkWidth))    
+                                            Math.floor(player.pos.z / chunkWidth))
     cameraPositionFolder.updateDisplay()
     var target = [ cameraPositionArray[0] + Math.cos(player.pitch) * Math.cos(player.yaw),
                     cameraPositionArray[1] - Math.sin(player.pitch),

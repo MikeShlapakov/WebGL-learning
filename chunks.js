@@ -7,7 +7,7 @@ class Chunk {
         this.rng = new RNG(this.params.seed);
         this.perlinNoise = new PerlinNoise(this.rng);
 
-        this.chunkGrid = this.initializeGrid();
+        this.chunkGrid = new OctreeNode({ x: chunkSize.width/2, y: chunkSize.width/2, z: chunkSize.width/2 }, chunkSize.width);
 
         this.mesh = new Array(chunkSize.width * chunkSize.height * chunkSize.width);
         for(let i = 0; i < this.mesh.length; i++){
@@ -19,57 +19,42 @@ class Chunk {
         this.toGenerate = true;
     }
 
-    initializeGrid() {
-        const grid = [];
-        for (let x = 0; x < this.size.width; x++) {
-            const slice = [];
-            for (let y = 0; y < this.size.height; y++) {
-                const row = [];
-                for (let z = 0; z < this.size.width; z++) {
-                    row.push({ id: 0, instanceId: null });
-                }
-                slice.push(row);
-            }
-            grid.push(slice);
-        }
-        return grid;
-    }
-
     isInBounds(x, y, z) {
         return (0 <= x && x < this.size.width) && (0 <= y && y < this.size.height) && (0 <= z && z < this.size.width);
     }
 
-    getBlockPositionByInstance(instance){
-        for (let x = 0; x < this.size.width; x++) {
-            for (let y = 0; y < this.size.height; y++) {
-                for (let z = 0; z < this.size.width; z++) {
-                    const block = this.getBlock(x, y, z);
-                    if(block.instanceId == instance){
-                        return {x: x, y: y, z: z};
-                    };
-                }
-            }
-        }
-        return null;
-    }
-
+    // Get block at specific position
     getBlock(x, y, z) {
-        if (this.isInBounds(x, y, z)) {
-            return this.chunkGrid[x][y][z];
-        }
-        return null;
+        const block = this.chunkGrid.getBlock({x, y, z});
+        return block;
     }
 
-    setBlockId(x, y, z, id) {
-        if (this.isInBounds(x, y, z)) {
-            this.chunkGrid[x][y][z].id = id;
-        }
+     // Add a block to the octree
+    addBlock(x, y, z, blockData) {
+        this.chunkGrid.insert({
+            position: {x, y, z},
+            id: blockData
+        });
     }
 
-    setBlockInstanceId(x, y, z, instanceId) {
-        if (this.isInBounds(x, y, z)) {
-            this.chunkGrid[x][y][z].instanceId = instanceId;
-        }
+    // Delete a block at the given position
+    deleteBlock(x, y, z) {
+        return this.chunkGrid.delete({x, y, z});
+    }
+
+    // Clear all blocks from the tree
+    clear() {
+        this.chunkGrid = new OctreeNode(
+            { x: this.chunkGrid.center.x, y: this.chunkGrid.center.y, z: this.chunkGrid.center.z },
+            this.chunkGrid.size
+        );
+    }
+
+    // Get all nodes in the tree
+    getAllNodes() {
+        const nodes = [];
+        this.chunkGrid.getAllNodes(nodes);
+        return nodes;
     }
 
     isFaceVisible(x, y, z){
@@ -90,7 +75,7 @@ class Chunk {
         ];
 
         for(let i = 0; i < neighbors.length; i++){
-            if (neighbors[i] && neighbors[i].id == 0) {
+            if (!neighbors[i]) {
                 visibleFaces.push(i);
             };
         }
@@ -111,19 +96,19 @@ class Chunk {
                 for (let y = 0; y <= this.size.height; y++) {
                     if (y < h) {
                         if(y < 4){
-                            this.setBlockId(x, y, z, 3); 
+                            this.addBlock(x, y, z, 3); 
                         }
                         else{
-                            this.setBlockId(x, y, z, 2); // Surface block
+                            this.addBlock(x, y, z, 2); // Surface block
                         }
                     } else if (y === h) {
                         if (y == 4) {
-                            this.setBlockId(x, y, z, 4); // Interior block
+                            this.addBlock(x, y, z, 4); // Interior block
                         }else if(y < 4){
-                            this.setBlockId(x, y, z, 3); 
+                            this.addBlock(x, y, z, 3); 
                         }
                         else{
-                            this.setBlockId(x, y, z, 1); // Surface block
+                            this.addBlock(x, y, z, 1); // Surface block
                         }
                     }
                     
@@ -134,49 +119,55 @@ class Chunk {
 
     generateMesh(){
         // update all the matrices
-        for(let x = 0; x < this.size.width; x++){
-            for(let y = 0; y < this.size.height; y++){
-                for(let z = 0; z < this.size.width; z++){
-                    const faces = this.isFaceVisible(x, y, z);
-
-                    faces.forEach((face) => {
-                        let instanceNum = this.getBlock(x, y, z).instanceId;
-                        if(instanceNum == null){
-                            this.setBlockInstanceId(x, y, z, this.instanceCount) 
-                            instanceNum = this.instanceCount;
-                            this.instanceCount++;
-                        }
-
-                        const positionMatrix = translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5);
-                        switch(face) {
-                            case 0: // top
-                                this.mesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI));
-                                break;
-                            case 1: 
-                                // front
-                                this.mesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI / -2));
-                                break;
-                            case 2: // left
-                                this.mesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / -2), Math.PI / -2));
-                                break;
-                            case 3: // right
-                                this.mesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / 2), Math.PI / 2));
-                                break;
-                            case 4: // back
-                                this.mesh[instanceNum].setPositionMatrix(face, yRotate(xRotate(positionMatrix, Math.PI / 2), Math.PI));
-                                break;
-                            case 5: 
-                                // bottom
-                                this.mesh[instanceNum].setPositionMatrix(face, positionMatrix);
-                                break;
-                        }
-
-                        this.mesh[instanceNum].setTextureMatrix(face, getTexturMatrix(face*textureSize, (this.getBlock(x, y, z).id - 1)*textureSize, textureSize, textureSize, atlasWidth, atlasHeight))
-                        // this.mesh[instanceNum].setNormalMatrix(face, transpose(inverse(this.mesh[instanceNum].getPositionMatrix(face))))
-                        this.mesh[instanceNum].setNormalMatrix(face, normals[face])
-                    })   
-                }
-            }
+        let instanceNum = 0;
+        let newMesh = new Array(this.size.width * this.size.height * this.size.width);
+        for(let i = 0; i < this.mesh.length; i++){
+            newMesh[i] = new Mesh(6);
         }
+
+        const blocks = this.getAllNodes();
+        blocks.forEach(block => {
+            // console.log(block.position, block.data);
+
+            let x = block.position.x;
+            let y = block.position.y;
+            let z = block.position.z;
+
+            const faces = this.isFaceVisible(x, y, z);
+            // console.log(faces)
+            faces.forEach((face) => {
+                instanceNum++;
+
+                const positionMatrix = translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5);
+                switch(face) {
+                    case 0: // top
+                        newMesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI));
+                        break;
+                    case 1: 
+                        // front
+                        newMesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI / -2));
+                        break;
+                    case 2: // left
+                        newMesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / -2), Math.PI / -2));
+                        break;
+                    case 3: // right
+                        newMesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / 2), Math.PI / 2));
+                        break;
+                    case 4: // back
+                        newMesh[instanceNum].setPositionMatrix(face, yRotate(xRotate(positionMatrix, Math.PI / 2), Math.PI));
+                        break;
+                    case 5: 
+                        // bottom
+                        newMesh[instanceNum].setPositionMatrix(face, positionMatrix);
+                        break;
+                }
+
+                newMesh[instanceNum].setTextureMatrix(face, getTexturMatrix(face*textureSize, (this.getBlock(x, y, z).id - 1)*textureSize, textureSize, textureSize, atlasWidth, atlasHeight))
+                // newMesh[instanceNum].setNormalMatrix(face, transpose(inverse(newMesh[instanceNum].getPositionMatrix(face))))
+                newMesh[instanceNum].setNormalMatrix(face, normals[face])
+            })   
+        });
+        this.instanceCount = instanceNum+1;
+        this.mesh = newMesh;
     }
 }

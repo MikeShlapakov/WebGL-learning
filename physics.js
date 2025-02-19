@@ -49,13 +49,11 @@ function castARay(world, cameraPos, cameraDirection, maxDistance){
 
         const block = world.getBlock(blockPos.x, blockPos.y, blockPos.z);
         if (block) {
-            if (block.id != 0){
-                return {
-                    position: blockPos,
-                    normal: normal,
-                    hit: true
-                };
-            }
+            return {
+                position: blockPos,
+                normal: normal,
+                hit: true
+            };
         }
     }
 
