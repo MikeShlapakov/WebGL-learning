@@ -37,31 +37,125 @@
 
             attribute vec4 aColor;
             attribute vec2 aTextCoord;
-            attribute mat3 aTextureMatrix;
+            attribute float aTextureId;
+            uniform vec2 uTextureSize;
+            uniform vec2 uAtlasSize;
 
             uniform mat4 uPmatrix;
             uniform mat4 uVmatrix;
-            attribute mat4 aMmatrix;
+            attribute float aMmatrix;
+
+            attribute vec2 aWorldPos;
 
             varying vec3 vFogDepth;
 
-            attribute vec3 aNormal;
+            attribute float aNormal;
 
             varying vec4 vWorldPosition;
             varying vec3 vNormal;
             varying vec4 vColor;
             varying vec2 vTextCoord;
 
-            void main(void) { 
-                vWorldPosition = aMmatrix*vec4(aPosition, 1.);
+            vec3 getNormal(float index) {
+                if(index == 0.0) return vec3(0, 1, 0);    // top
+                if(index == 1.0) return vec3(0, 0, 1);    // front
+                if(index == 2.0) return vec3(-1, 0, 0);   // left
+                if(index == 3.0) return vec3(1, 0, 0);    // right
+                if(index == 4.0) return vec3(0, 0, -1);   // back
+                if(index == 5.0) return vec3(0, -1, 0);   // bottom
+                return vec3(0, 0, 0);
+            }
 
+            mat3 getTextureMatrix(vec2 offset, vec2 size, vec2 atlasSize) {
+                return mat3(
+                    size.x / atlasSize.x,   0.0,                    0.0,
+                    0.0,                    size.y / atlasSize.y,   0.0,
+                    offset.x / atlasSize.x, offset.y / atlasSize.y, 1.0
+                );
+            }
+
+            // Rotation matrices
+            mat4 xRotationMatrix(float angle) {
+                return mat4(
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, cos(angle), sin(angle), 0.0,
+                    0.0, -sin(angle), cos(angle), 0.0,
+                    0.0, 0.0, 0.0, 1.0
+                );
+            }
+
+            mat4 yRotationMatrix(float angle) {
+                return mat4(
+                    cos(angle), 0.0, -sin(angle), 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    sin(angle), 0.0, cos(angle), 0.0,
+                    0.0, 0.0, 0.0, 1.0
+                );
+            }
+
+            mat4 zRotationMatrix(float angle) {
+                return mat4(
+                    cos(angle), sin(angle), 0.0, 0.0,
+                    -sin(angle), cos(angle), 0.0, 0.0,
+                    0.0, 0.0, 1.0, 0.0,
+                    0.0, 0.0, 0.0, 1.0
+                );
+            }
+
+            // Get rotation matrix based on face index
+            mat4 getFaceRotation(float faceIndex) {
+                const float PI = 3.14159265359;
+                
+                if(faceIndex == 0.0) { // top
+                    return xRotationMatrix(PI);
+                }
+                else if(faceIndex == 1.0) { // front
+                    return xRotationMatrix(-PI / 2.0);
+                }
+                else if(faceIndex == 2.0) { // left
+                    return zRotationMatrix(-PI / 2.0) * yRotationMatrix(-PI / 2.0);
+                }
+                else if(faceIndex == 3.0) { // right
+                    return zRotationMatrix(PI / 2.0) * yRotationMatrix(PI / 2.0);
+                }
+                else if(faceIndex == 4.0) { // back
+                    return xRotationMatrix(PI / 2.0) * yRotationMatrix(PI);
+                }
+                // // bottom (faceIndex == 5.0) - no rotation needed
+                return mat4(1.0);
+            }
+
+            void main(void) { 
+                
+                float posX = floor(mod(aMmatrix / 32.0 / 32.0, 32.0));
+                float posY = floor(mod(aMmatrix / 32.0, 32.0));
+                float posZ = floor(mod(aMmatrix , 32.0));
+                
+                
+                vec3 pos = vec3(posX, posY, posZ);
+                // Create translation matrix
+                mat4 translationMatrix = mat4(
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0, 0.0,
+                    pos.x + 0.5 + aWorldPos.x, pos.y + 0.5, pos.z + 0.5 + aWorldPos.y, 1.0
+                );
+
+                mat4 rotationMatrix = getFaceRotation(aNormal);
+
+                // Apply face rotation
+                mat4 positionMatrix = translationMatrix * rotationMatrix;
+                
+                vWorldPosition = positionMatrix*vec4(aPosition, 1.);
+            
                 gl_Position = uPmatrix*uVmatrix*vWorldPosition;
 
-                vNormal = aNormal;
+                vNormal = getNormal(aNormal);
 
-                vTextCoord = (aTextureMatrix * vec3(aTextCoord, 1.)).xy;
+                mat3 textureMatrix = getTextureMatrix(vec2(aNormal*uTextureSize.x, aTextureId*uTextureSize.y), uTextureSize, uAtlasSize);
+                vTextCoord = (textureMatrix * vec3(aTextCoord, 1.)).xy;
 
-                // vColor = vec4(abs(aNormal), 1.); // * aColor; // change this to see colors *.*
+                // vColor = vec4(abs(vNormal), 1.); // * aColor; // change this to see colors *.*
 
                 vFogDepth = (uVmatrix*vWorldPosition).xyz;
             }

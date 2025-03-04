@@ -138,36 +138,16 @@ class Chunk {
             faces.forEach((face) => {
                 instanceNum++;
 
-                const positionMatrix = translation((this.position.x + x) + 0.5, y + 0.5, (this.position.z + z) + 0.5);
-                switch(face) {
-                    case 0: // top
-                        newMesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI));
-                        break;
-                    case 1: 
-                        // front
-                        newMesh[instanceNum].setPositionMatrix(face, xRotate(positionMatrix, Math.PI / -2));
-                        break;
-                    case 2: // left
-                        newMesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / -2), Math.PI / -2));
-                        break;
-                    case 3: // right
-                        newMesh[instanceNum].setPositionMatrix(face, yRotate(zRotate(positionMatrix, Math.PI / 2), Math.PI / 2));
-                        break;
-                    case 4: // back
-                        newMesh[instanceNum].setPositionMatrix(face, yRotate(xRotate(positionMatrix, Math.PI / 2), Math.PI));
-                        break;
-                    case 5: 
-                        // bottom
-                        newMesh[instanceNum].setPositionMatrix(face, positionMatrix);
-                        break;
-                }
-
-                newMesh[instanceNum].setTextureMatrix(face, getTexturMatrix(face*textureSize, (this.getBlock(x, y, z).id - 1)*textureSize, textureSize, textureSize, atlasWidth, atlasHeight))
-                // newMesh[instanceNum].setNormalMatrix(face, transpose(inverse(newMesh[instanceNum].getPositionMatrix(face))))
-                newMesh[instanceNum].setNormalMatrix(face, normals[face])
+                newMesh[instanceNum].setPositionMatrix(face, this.packPosition(x, y, z));
+                newMesh[instanceNum].setTextureMatrix(face, this.getBlock(x, y, z).id - 1);
+                newMesh[instanceNum].setNormalMatrix(face, face)
             })   
         });
         this.instanceCount = instanceNum+1;
         this.mesh = newMesh;
+    }
+
+    packPosition(x, y, z) {
+        return (x * 32 * 32) + (y * 32) + z;
     }
 }

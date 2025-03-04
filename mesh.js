@@ -37,30 +37,30 @@ class Mesh {
     // Setters
     setPositionMatrix(index, value) {
         if (this.isValidIndex(index)) {
-            if (value.length === 16) {
+            // if (value.length === 16) {
                 this.positionMatrix[index] = value;
-            } else {
-                throw new Error('Value must be of length 16');
-            }
+            // } else {
+            //     throw new Error('Value must be of length 16');
+            // }
         }
     }
 
     setNormalMatrix(index, value) {
         if (this.isValidIndex(index)) {
-            if (value.length === 3) {
+            if (0 <= value && value <= 5) {
                 this.normalMatrix[index] = value;
             } else {
-                throw new Error('Value must be of length 3');
+                throw new Error('Value must be between 0 and 5');
             }
         }
     }
 
     setTextureMatrix(index, value) {
         if (this.isValidIndex(index)) {
-            if (value.length === 9) {
+            if (0 <= value && value <= 15) {
                 this.textureMatrix[index] = value;
             } else {
-                throw new Error('Value must be of length 9');
+                throw new Error('Value must be between 0 and 15');
             }
         }
     }

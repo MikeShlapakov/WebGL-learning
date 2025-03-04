@@ -52,13 +52,11 @@ class World {
                     const positionMatrix = chunk.mesh[i].getPositionMatrix(face);
                     const normalMatrix = chunk.mesh[i].getNormalMatrix(face);
                     const textureMatrix = chunk.mesh[i].getTextureMatrix(face);
-                    for (let j = 0; j < 16; ++j) {
-                        this.matrices.positionMatrices[chunkStartIndex][j] = positionMatrix[j];
-                        this.matrices.normalMatrices[chunkStartIndex][j] = normalMatrix[j]; 
-                    }
-                    for (let j = 0; j < 9; ++j) {
-                        this.matrices.textureMatrices[chunkStartIndex][j] = textureMatrix[j];
-                    }
+                    this.matrices.worldPos[chunkStartIndex][0] = chunk.position.x;
+                    this.matrices.worldPos[chunkStartIndex][1] = chunk.position.z;
+                    this.matrices.positionMatrices[chunkStartIndex] = positionMatrix;
+                    this.matrices.normalMatrices[chunkStartIndex] = normalMatrix; 
+                    this.matrices.textureMatrices[chunkStartIndex] = textureMatrix;
                     chunkStartIndex++;
                 }
             }
