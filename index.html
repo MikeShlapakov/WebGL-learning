@@ -37,25 +37,22 @@
 
             in vec4 aColor;
             in vec2 aTextCoord;
-            in float aTextureId;
             uniform vec2 uTextureSize;
             uniform vec2 uAtlasSize;
 
             uniform mat4 uPmatrix;
             uniform mat4 uVmatrix;
-            in float aMmatrix; 
 
             in vec2 aWorldPos;
+            in float aData;
 
             out vec3 vFogDepth;
-            
-            in float aNormal;
 
             out vec4 vWorldPosition;
             out vec3 vNormal;
             out vec4 vColor;
             out vec2 vTextCoord;
-            
+
             vec3 getNormal(float index) {
                 if(index == 0.0) return vec3(0, 1, 0);    // top    +Y
                 if(index == 1.0) return vec3(0, 0, 1);    // front  +Z
@@ -114,12 +111,13 @@
             }
 
             void main() {
-                // Use bitwise operations to extract posX, posY, posZ from aMmatrix
+                int intData = int(aData);
 
-                float posX = floor(mod(aMmatrix / 32.0 / 32.0, 32.0));
-                float posY = floor(mod(aMmatrix / 32.0, 32.0));
-                float posZ = floor(mod(aMmatrix , 32.0));
-
+                float posX =       float(intData & 31);
+                float posY =       float((intData >> 5) & 31);
+                float posZ =       float((intData >> 10) & 31);
+                float aNormal =    float((intData >> 15) & 7);
+                float aTextureId = float((intData >> 18) & 15);
 
                 vec3 pos = vec3(posX, posY, posZ);
                 // Create translation matrix

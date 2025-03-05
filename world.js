@@ -48,15 +48,10 @@ class World {
             } 
             for (let i = 0; i < chunk.instanceCount; i++) {
                 for (let face = 0; face < 6; face++){
-                    if (chunk.mesh[i].getPositionMatrix(face) === null) continue;
-                    const positionMatrix = chunk.mesh[i].getPositionMatrix(face);
-                    const normalMatrix = chunk.mesh[i].getNormalMatrix(face);
-                    const textureMatrix = chunk.mesh[i].getTextureMatrix(face);
+                    if (chunk.mesh[i].getVoxelData(face) === null) continue;
                     this.matrices.worldPos[chunkStartIndex][0] = chunk.position.x;
                     this.matrices.worldPos[chunkStartIndex][1] = chunk.position.z;
-                    this.matrices.positionMatrices[chunkStartIndex] = positionMatrix;
-                    this.matrices.normalMatrices[chunkStartIndex] = normalMatrix; 
-                    this.matrices.textureMatrices[chunkStartIndex] = textureMatrix;
+                    this.matrices.voxelData[chunkStartIndex] = chunk.mesh[i].getVoxelData(face);
                     chunkStartIndex++;
                 }
             }

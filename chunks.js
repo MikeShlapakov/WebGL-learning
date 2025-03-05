@@ -137,17 +137,11 @@ class Chunk {
             // console.log(faces)
             faces.forEach((face) => {
                 instanceNum++;
-
-                newMesh[instanceNum].setPositionMatrix(face, this.packPosition(x, y, z));
-                newMesh[instanceNum].setTextureMatrix(face, this.getBlock(x, y, z).id - 1);
-                newMesh[instanceNum].setNormalMatrix(face, face)
+                let value = ((this.getBlock(x, y, z).id - 1) << 18) | (face << 15) | (z << 10) | (y << 5) | x;
+                newMesh[instanceNum].setVoxelData(face, value);
             })   
         });
         this.instanceCount = instanceNum+1;
         this.mesh = newMesh;
-    }
-
-    packPosition(x, y, z) {
-        return (x * 32 * 32) + (y * 32) + z;
     }
 }

@@ -71,15 +71,15 @@ const cloudsProgram = createProgramFromSource(gl, {vertexShader:"clouds-vertex-s
                                                     fragmentShader:"clouds-fragment-shader"})
 
 /*======== Associating attributes to vertex shader =====*/
+var aPosition = gl.getAttribLocation(mainProgram, "aPosition");
+
 var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
 var uVmatrix = gl.getUniformLocation(mainProgram, "uVmatrix");
-var aMmatrix = gl.getAttribLocation(mainProgram, "aMmatrix");
-var aWorldPos = gl.getAttribLocation(mainProgram, "aWorldPos");
 
-var aNormal = gl.getAttribLocation(mainProgram, "aNormal");
+var aWorldPos = gl.getAttribLocation(mainProgram, "aWorldPos");
+var aData = gl.getAttribLocation(mainProgram, "aData");
 
 var aTextCoord = gl.getAttribLocation(mainProgram, "aTextCoord");
-var aTextureId = gl.getAttribLocation(mainProgram, "aTextureId");
 var uTextureSize = gl.getUniformLocation(mainProgram, "uTextureSize");
 var uAtlasSize = gl.getUniformLocation(mainProgram, "uAtlasSize");
 var uTexture = gl.getUniformLocation(mainProgram, "uTexture");
@@ -214,6 +214,7 @@ var cloudsIndexbuffer = createBufferFromArray(new Uint32Array(
 const numInstances = Math.min(chunkWidth*chunkHeight*chunkWidth*((2*chunksNum-1)**2)*6, 2<<16);
 console.log("Max Instances number:", numInstances)
 
+// chunk position data
 const worldPosData = new Float32Array(numInstances * 2);
 const worldPos = [];
 for (let i = 0; i < numInstances; ++i) {
@@ -223,25 +224,15 @@ const worldPosBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, worldPosBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, worldPosData.byteLength, gl.DYNAMIC_DRAW);
 
-// make a typed array with one view per matrix
-const matrixData = new Float32Array(numInstances);
-const matrixBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, matrixData.byteLength, gl.DYNAMIC_DRAW);
-
-const normalMatricesData = new Float32Array(numInstances);
-const normalMatricesBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, normalMatricesBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, normalMatricesData.byteLength, gl.DYNAMIC_DRAW);
-
-const textureMatricesData = new Float32Array(numInstances);
-const textureMatrixBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, textureMatricesData.byteLength, gl.DYNAMIC_DRAW);
+// voxel data
+const voxelData = new Float32Array(numInstances);
+const voxelDataBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, voxelDataBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, voxelData.byteLength, gl.DYNAMIC_DRAW);
 
 let countInstances = 0;
 
-const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {worldPos:worldPos, positionMatrices:matrixData, normalMatrices:normalMatricesData, textureMatrices: textureMatricesData}, countInstances);
+const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {worldPos:worldPos, voxelData:voxelData}, countInstances);
 world.generateChunks();
 countInstances = world.generateAllMeshes();
 
@@ -420,8 +411,6 @@ var animate = function() {
     gl.useProgram(mainProgram);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-    
-    var aPosition = gl.getAttribLocation(mainProgram, "aPosition");
     gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(aPosition);
     
@@ -430,34 +419,19 @@ var animate = function() {
     gl.enableVertexAttribArray(aWorldPos);
     gl.vertexAttribPointer(aWorldPos, 2, gl.FLOAT, false, 0,0);
     gl.vertexAttribDivisor(aWorldPos, 1);
-
-    // upload the transformation matrix data
-    gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, matrixData);
-    gl.enableVertexAttribArray(aMmatrix);
-    gl.vertexAttribPointer(aMmatrix, 1, gl.FLOAT, false, 0,0);
-    gl.vertexAttribDivisor(aMmatrix, 1);
-
-
-    // upload the normal matrix data
-    gl.bindBuffer(gl.ARRAY_BUFFER, normalMatricesBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatricesData);
-    gl.enableVertexAttribArray(aNormal);
-    gl.vertexAttribPointer(aNormal, 1, gl.FLOAT, false, 0,0);
-    gl.vertexAttribDivisor(aNormal, 1);
+    
+    // upload the data
+    gl.bindBuffer(gl.ARRAY_BUFFER, voxelDataBuffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, voxelData);
+    gl.enableVertexAttribArray(aData);
+    gl.vertexAttribPointer(aData, 1, gl.FLOAT, false, 0,0);
+    gl.vertexAttribDivisor(aData, 1);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
     gl.uniform2f(uTextureSize, textureSize, textureSize);
     gl.uniform2f(uAtlasSize, atlasWidth, atlasHeight);
-    // Upload the texture matrix data
-    gl.bindBuffer(gl.ARRAY_BUFFER, textureMatrixBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, textureMatricesData);
-    gl.enableVertexAttribArray(aTextureId);
-    gl.vertexAttribPointer(aTextureId, 1, gl.FLOAT, false, 0,0);
-    gl.vertexAttribDivisor(aTextureId, 1);
-
 
     var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
     gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
