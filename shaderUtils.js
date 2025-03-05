@@ -61,7 +61,7 @@ function setMatrixAttributes(gl, location, size, type, normalize = false){
         const loc = location + i ;
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, size, type, normalize, sizeOfType * size * size, i * sizeOfType * size);
-        ext.vertexAttribDivisorANGLE(loc, 1);
+        gl.vertexAttribDivisor(loc, 1);
     }
 }
 
