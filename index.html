@@ -43,7 +43,7 @@
             uniform mat4 uPmatrix;
             uniform mat4 uVmatrix;
 
-            in vec2 aWorldPos;
+            uniform vec2 uWorldPos;
             in float aData;
 
             out vec3 vFogDepth;
@@ -125,7 +125,7 @@
                     1.0, 0.0, 0.0, 0.0,
                     0.0, 1.0, 0.0, 0.0,
                     0.0, 0.0, 1.0, 0.0,
-                    pos.x + 0.5 + aWorldPos.x, pos.y + 0.5, pos.z + 0.5 + aWorldPos.y, 1.0
+                    pos.x + 0.5 + uWorldPos.x, pos.y + 0.5, pos.z + 0.5 + uWorldPos.y, 1.0
                 );
 
                 mat4 rotationMatrix = getFaceRotation(aNormal);

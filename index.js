@@ -76,7 +76,7 @@ var aPosition = gl.getAttribLocation(mainProgram, "aPosition");
 var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
 var uVmatrix = gl.getUniformLocation(mainProgram, "uVmatrix");
 
-var aWorldPos = gl.getAttribLocation(mainProgram, "aWorldPos");
+var uWorldPos = gl.getUniformLocation(mainProgram, "uWorldPos");
 var aData = gl.getAttribLocation(mainProgram, "aData");
 
 var aTextCoord = gl.getAttribLocation(mainProgram, "aTextCoord");
@@ -211,32 +211,13 @@ var cloudsIndexbuffer = createBufferFromArray(new Uint32Array(
 /*========== Defining and storing the geometry ==========*/
 
 // setup matrices, one per instance
-const numInstances = Math.min(chunkWidth*chunkHeight*chunkWidth*((2*chunksNum-1)**2)*6, 2<<16);
+const numInstances = chunkWidth*chunkHeight*chunkWidth*((2*chunksNum-1)**2)*6;
 console.log("Max Instances number:", numInstances)
 
-// chunk position data
-const worldPosData = new Float32Array(numInstances * 2);
-const worldPos = [];
-for (let i = 0; i < numInstances; ++i) {
-    worldPos.push(new Float32Array(worldPosData.buffer, i * 2 * 4, 2));
-}
-const worldPosBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, worldPosBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, worldPosData.byteLength, gl.DYNAMIC_DRAW);
-
-// voxel data
-const voxelData = new Float32Array(numInstances);
-const voxelDataBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, voxelDataBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, voxelData.byteLength, gl.DYNAMIC_DRAW);
-
-let countInstances = 0;
-
-const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance, {worldPos:worldPos, voxelData:voxelData}, countInstances);
+const world = new World({width:chunkWidth, height:chunkHeight}, renderDistance);
 world.generateChunks();
-countInstances = world.generateAllMeshes();
-
-console.log("Number of instances:", countInstances) // before: 25647, after: 45153
+let countInstances = world.generateAllMeshes();
+console.log("Number of instances:", countInstances) // per voxel: 25647, per face (no greedy meshing): 75506 (32*32*3)
 
 // Create a texture.
 var texture = gl.createTexture();
@@ -392,8 +373,8 @@ var animate = function() {
     
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
     var cameraPositionArray = calculateCameraPos(player.pos, obj.speed, player.yaw, player.pitch);
-    countInstances = world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
-                                            Math.floor(player.pos.z / chunkWidth))
+    world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
+                        Math.floor(player.pos.z / chunkWidth))
     cameraPositionFolder.updateDisplay()
     var target = [ cameraPositionArray[0] + Math.cos(player.pitch) * Math.cos(player.yaw),
                     cameraPositionArray[1] - Math.sin(player.pitch),
@@ -413,19 +394,6 @@ var animate = function() {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
     gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(aPosition);
-    
-    gl.bindBuffer(gl.ARRAY_BUFFER, worldPosBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, worldPosData);
-    gl.enableVertexAttribArray(aWorldPos);
-    gl.vertexAttribPointer(aWorldPos, 2, gl.FLOAT, false, 0,0);
-    gl.vertexAttribDivisor(aWorldPos, 1);
-    
-    // upload the data
-    gl.bindBuffer(gl.ARRAY_BUFFER, voxelDataBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, voxelData);
-    gl.enableVertexAttribArray(aData);
-    gl.vertexAttribPointer(aData, 1, gl.FLOAT, false, 0,0);
-    gl.vertexAttribDivisor(aData, 1);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -464,8 +432,19 @@ var animate = function() {
 
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+    
+    world.chunks.forEach(chunk => {
+        // upload the data
+        gl.uniform2f(uWorldPos, chunk.position.x, chunk.position.z);
 
-    gl.drawElementsInstanced(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, countInstances);
+        var voxelDataBuffer = createBufferFromArray(new Float32Array(chunk.mesh), gl.ARRAY_BUFFER);
+        gl.bindBuffer(gl.ARRAY_BUFFER, voxelDataBuffer);
+        gl.enableVertexAttribArray(aData);
+        gl.vertexAttribPointer(aData, 1, gl.FLOAT, false, 0,0);
+        gl.vertexAttribDivisor(aData, 1);
+
+        gl.drawElementsInstanced(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, chunk.instanceCount);
+    });
     
     renderSum += performance.now() - renderTime
     frameCount++;
@@ -494,15 +473,14 @@ var animate = function() {
         player.blockSelected = true
         drawPicker(time, ray.position, ray.normal, proj_matrix, view_matrix)
         if(player.breakBlock){
-            countInstances = world.removeBlock(ray.position.x, ray.position.y, ray.position.z);
-            // console.log("done", world.chunks, countInstances)
+            world.removeBlock(ray.position.x, ray.position.y, ray.position.z);
             player.breakBlock = false;
         }
         if(player.placeBlock){
-            countInstances = world.addBlock(ray.position.x + ray.normal.x,
-                                                ray.position.y + ray.normal.y, 
-                                                ray.position.z + ray.normal.z,
-                                                player.blockType)
+            world.addBlock(ray.position.x + ray.normal.x,
+                            ray.position.y + ray.normal.y, 
+                            ray.position.z + ray.normal.z,
+                            player.blockType)
             player.placeBlock = false;
         }
     }

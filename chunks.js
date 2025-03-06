@@ -9,10 +9,7 @@ class Chunk {
 
         this.chunkGrid = new OctreeNode({ x: chunkSize.width/2, y: chunkSize.width/2, z: chunkSize.width/2 }, chunkSize.width);
 
-        this.mesh = new Array(chunkSize.width * chunkSize.height * chunkSize.width);
-        for(let i = 0; i < this.mesh.length; i++){
-            this.mesh[i] = new Mesh(6);
-        }
+        this.mesh = [];
 
         this.instanceCount = 0;
 
@@ -118,12 +115,8 @@ class Chunk {
     }
 
     generateMesh(){
-        // update all the matrices
-        let instanceNum = 0;
-        let newMesh = new Array(this.size.width * this.size.height * this.size.width);
-        for(let i = 0; i < this.mesh.length; i++){
-            newMesh[i] = new Mesh(6);
-        }
+        this.instanceCount = 0;
+        this.mesh = [];
 
         const blocks = this.getAllNodes();
         blocks.forEach(block => {
@@ -136,12 +129,10 @@ class Chunk {
             const faces = this.isFaceVisible(x, y, z);
             // console.log(faces)
             faces.forEach((face) => {
-                instanceNum++;
+                this.instanceCount++;
                 let value = ((this.getBlock(x, y, z).id - 1) << 18) | (face << 15) | (z << 10) | (y << 5) | x;
-                newMesh[instanceNum].setVoxelData(face, value);
+                this.mesh.push(value);
             })   
         });
-        this.instanceCount = instanceNum+1;
-        this.mesh = newMesh;
     }
 }

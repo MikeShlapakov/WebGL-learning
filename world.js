@@ -1,10 +1,8 @@
 class World {
-    constructor(chunkSize, renderDist, matrices, countInstances, worldParams = {seed: 123, terrain: {scale:20,offset: 0,magnitude: 0.4}}) {
+    constructor(chunkSize, renderDist, worldParams = {seed: 123, terrain: {scale:20,offset: 0,magnitude: 0.4}}) {
         this.chunkSize = chunkSize;
         this.renderDist = renderDist;
-        this.matrices = matrices;
         this.worldParams = worldParams;
-        this.countInstances = countInstances;
         
         this.chunks = [];
     }
@@ -40,24 +38,15 @@ class World {
     }
 
     generateAllMeshes(){
-        let chunkStartIndex = 0;
+        let countInstances = 0;
         for (const chunk of this.chunks) {
             if(chunk.toGenerate){
                 chunk.generateMesh();
                 chunk.toGenerate = false;
-            } 
-            for (let i = 0; i < chunk.instanceCount; i++) {
-                for (let face = 0; face < 6; face++){
-                    if (chunk.mesh[i].getVoxelData(face) === null) continue;
-                    this.matrices.worldPos[chunkStartIndex][0] = chunk.position.x;
-                    this.matrices.worldPos[chunkStartIndex][1] = chunk.position.z;
-                    this.matrices.voxelData[chunkStartIndex] = chunk.mesh[i].getVoxelData(face);
-                    chunkStartIndex++;
-                }
+                countInstances += chunk.instanceCount;
             }
         }
-        this.countInstances = chunkStartIndex;
-        return this.countInstances;
+        return countInstances;
     }
 
     removeBlock(x, y, z){
@@ -83,13 +72,13 @@ class World {
 
         // requestIdleCallback(this.generateAllMeshes.bind(this), { timeout: 1000 });
         this.generateAllMeshes();
-        return this.countInstances;
+        return;
     }
 
     addBlock(x, y, z, blockType){
         
         const chunk = this.getChunk(this.positionToChunk(x, y, z));
-        if(!chunk) return this.countInstances;
+        if(!chunk) return;
 
         const localX = (x % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;
         const localZ = (z % this.chunkSize.width + this.chunkSize.width) % this.chunkSize.width;       
@@ -100,7 +89,7 @@ class World {
         
         this.generateAllMeshes();
 
-        return this.countInstances;
+        return;
     }
 
     renderChunks(chunkX, chunkZ){
@@ -159,7 +148,7 @@ class World {
             }
         }
 
-        return this.countInstances;
+        return;
     }
 
     getBlock(x, y, z) {
