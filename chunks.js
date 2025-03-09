@@ -11,6 +11,8 @@ class Chunk {
 
         this.mesh = [];
 
+        this.ao = [];
+
         this.instanceCount = 0;
 
         this.toGenerate = true;
@@ -62,14 +64,61 @@ class Chunk {
             return visibleFaces;
         }
 
-        const neighbors = [
-            world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
-            world.getBlock(this.position.x + x, y, this.position.z + z + 1), // Front
-            world.getBlock(this.position.x + x - 1, y, this.position.z + z), // Left
-            world.getBlock(this.position.x + x + 1, y, this.position.z + z), // Right
-            world.getBlock(this.position.x + x, y, this.position.z + z - 1), // Back
-            world.getBlock(this.position.x + x, y - 1, this.position.z + z), // Bottom
-        ];
+        
+        // const playerX = Math.floor(player.pos.x / this.size.width);
+        // const playerZ = Math.floor(player.pos.z / this.size.width);
+        let neighbors = []
+        // if (this.position.x == playerX && this.position.z == playerZ){
+            neighbors = [
+                world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
+                world.getBlock(this.position.x + x, y, this.position.z + z + 1), // Front
+                world.getBlock(this.position.x + x - 1, y, this.position.z + z), // Left
+                world.getBlock(this.position.x + x + 1, y, this.position.z + z), // Right
+                world.getBlock(this.position.x + x, y, this.position.z + z - 1), // Back
+                world.getBlock(this.position.x + x, y - 1, this.position.z + z), // Bottom
+            ];
+        // }
+        // else{
+        //     neighbors = [
+        //         world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
+        //     ];
+
+        //     if (playerZ == this.position.z){
+        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z + 1));
+        //         if (this.position.x < playerX) { 
+        //             neighbors.push(1, world.getBlock(this.position.x + x + 1, y, this.position.z + z));
+        //         } else if (this.position.x > playerX) {
+        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z), 1);
+        //         }
+        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z - 1));
+        //     }
+        //     else if ( this.position.z > playerZ) {
+        //         neighbors.push(1);
+        //         if (playerX == this.position.x){
+        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z));
+        //             neighbors.push(world.getBlock(this.position.x + x + 1, y, this.position.z + z));
+        //         }
+        //         else if (this.position.x < playerX) { 
+        //             neighbors.push(1, world.getBlock(this.position.x + x + 1, y, this.position.z + z));
+        //         } else if (this.position.x > playerX) {
+        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z), 1);
+        //         }
+        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z - 1));
+        //     } else if (this.position.z < playerZ) {
+        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z + 1));
+        //         if (playerX == this.position.x){
+        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z));
+        //             neighbors.push(world.getBlock(this.position.x + x + 1, y, this.position.z + z));
+        //         }
+        //         else if (this.position.x < playerX) { 
+        //             neighbors.push(1, world.getBlock(this.position.x + x + 1, y, this.position.z + z));
+        //         } else if (this.position.x > playerX) {
+        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z), 1);
+        //         }
+        //         neighbors.push(1);
+        //     }
+        //     neighbors.push(world.getBlock(this.position.x + x, y - 1, this.position.z + z));
+        // } 
 
         for(let i = 0; i < neighbors.length; i++){
             if (!neighbors[i]) {
@@ -117,6 +166,7 @@ class Chunk {
     generateMesh(){
         this.instanceCount = 0;
         this.mesh = [];
+        this.ao = [];
 
         const blocks = this.getAllNodes();
         blocks.forEach(block => {
@@ -130,9 +180,104 @@ class Chunk {
             // console.log(faces)
             faces.forEach((face) => {
                 this.instanceCount++;
-                let value = ((this.getBlock(x, y, z).id - 1) << 18) | (face << 15) | (z << 10) | (y << 5) | x;
+                let value = ((this.getBlock(x, y, z).id - 1) << 21) | (face << 18) | (z << 12) | (y << 6) | x;
                 this.mesh.push(value);
+
+                let faceNeighbours = this.getFaceNeighbours(face, this.position.x + x, y, this.position.z + z);
+
+                this.ao.push(this.calculateCornerAO(faceNeighbours[0], faceNeighbours[1], faceNeighbours[2]),
+                            this.calculateCornerAO(faceNeighbours[2], faceNeighbours[3], faceNeighbours[4]),
+                            this.calculateCornerAO(faceNeighbours[4], faceNeighbours[5], faceNeighbours[6]),
+                            this.calculateCornerAO(faceNeighbours[6], faceNeighbours[7], faceNeighbours[0]))
             })   
         });
+    }
+
+    getFaceNeighbours(face, x, y, z) {
+        switch(face) {
+            case 0: // top +Y
+                return [
+                    world.getBlock(x - 1, y + 1, z),
+                    world.getBlock(x - 1, y + 1, z + 1),
+                    world.getBlock(x, y + 1, z + 1),
+                    world.getBlock(x + 1, y + 1, z + 1),
+                    world.getBlock(x + 1, y + 1, z),
+                    world.getBlock(x + 1, y + 1, z - 1),
+                    world.getBlock(x, y + 1, z - 1),
+                    world.getBlock(x - 1, y + 1, z - 1),
+                ];
+            case 1: // front +Z
+                return [
+                    world.getBlock(x - 1, y, z + 1),
+                    world.getBlock(x - 1, y - 1, z + 1),
+                    world.getBlock(x, y - 1, z + 1),
+                    world.getBlock(x + 1, y - 1, z + 1),
+                    world.getBlock(x + 1, y, z + 1),
+                    world.getBlock(x + 1, y + 1, z + 1),
+                    world.getBlock(x, y + 1, z + 1),
+                    world.getBlock(x - 1, y + 1, z + 1),
+                ];
+            case 2: // left -X
+                return [
+                    world.getBlock(x - 1, y, z - 1),
+                    world.getBlock(x - 1, y - 1, z - 1),
+                    world.getBlock(x - 1, y - 1, z),
+                    world.getBlock(x - 1, y - 1, z + 1),
+                    world.getBlock(x - 1, y, z + 1),
+                    world.getBlock(x - 1, y + 1, z + 1),
+                    world.getBlock(x - 1, y + 1, z),
+                    world.getBlock(x - 1, y + 1, z - 1),
+                ];
+            case 3: // right +X
+                return [
+                    world.getBlock(x + 1, y, z + 1),
+                    world.getBlock(x + 1, y - 1, z + 1),
+                    world.getBlock(x + 1, y - 1, z),
+                    world.getBlock(x + 1, y - 1, z - 1),
+                    world.getBlock(x + 1, y, z - 1),
+                    world.getBlock(x + 1, y + 1, z - 1),
+                    world.getBlock(x + 1, y + 1, z),
+                    world.getBlock(x + 1, y + 1, z + 1),
+                ];
+            case 4: // back -Z
+                return [
+                    world.getBlock(x + 1, y, z - 1),
+                    world.getBlock(x + 1, y - 1, z - 1),
+                    world.getBlock(x, y - 1, z - 1),
+                    world.getBlock(x - 1, y - 1, z - 1),
+                    world.getBlock(x - 1, y, z - 1),
+                    world.getBlock(x - 1, y + 1, z - 1),
+                    world.getBlock(x, y + 1, z - 1),
+                    world.getBlock(x + 1, y + 1, z - 1),
+                ];
+            case 5: // bottom -Y
+                return [
+                    world.getBlock(x - 1, y - 1, z),
+                    world.getBlock(x - 1, y - 1, z - 1),
+                    world.getBlock(x, y - 1, z - 1),
+                    world.getBlock(x + 1, y - 1, z - 1),
+                    world.getBlock(x + 1, y - 1, z),
+                    world.getBlock(x + 1, y - 1, z + 1),
+                    world.getBlock(x, y - 1, z + 1),
+                    world.getBlock(x - 1, y - 1, z + 1),
+                ];
+            default:
+                throw new Error("Invalid face value");
+        }
+    }
+
+    // Calculate AO value for a corner based on surrounding blocks
+    calculateCornerAO(side1, corner, side2) {
+        
+        if (side1 && side2) {
+            return 0.25; 
+        }
+        
+        let count = 0;
+        if (side1) count++;
+        if (side2) count++;
+        if (corner) count++;
+        
+        return 1 - 0.25*count;
     }
 }

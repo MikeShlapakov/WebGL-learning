@@ -53,6 +53,14 @@ let colors = [];
 console.log("Number of vertices:", vertices.length);
 console.log("Number of indices:", indices.length);
 
+/*================= Mouse and Player ======================*/
+
+const mousePos = {x: 0, y: 0}
+
+const player = {pos: {x: chunkWidth/2, y:chunkHeight+2, z: chunkWidth/2}, yaw: 0, pitch: 0,
+                blockType: 3, blockSelected: false, breakBlock: false, placeBlock: false,
+                hitbox: {width: 0.3, height: 1.65}}
+
 /*=================== Initialize Programs =================== */
 
 const mainProgram = createProgramFromSource(gl, {vertexShader:"vertex-shader-3d",
@@ -73,18 +81,18 @@ const cloudsProgram = createProgramFromSource(gl, {vertexShader:"clouds-vertex-s
 /*======== Associating attributes to vertex shader =====*/
 var aPosition = gl.getAttribLocation(mainProgram, "aPosition");
 
+var aTextCoord = gl.getAttribLocation(mainProgram, "aTextCoord");
+var uTextureSize = gl.getUniformLocation(mainProgram, "uTextureSize");
+var uAtlasSize = gl.getUniformLocation(mainProgram, "uAtlasSize");
+var uTexture = gl.getUniformLocation(mainProgram, "uTexture");
+var aAmbientOcclusion = gl.getAttribLocation(mainProgram, "aAmbientOcclusion");
+
 var uPmatrix = gl.getUniformLocation(mainProgram, "uPmatrix");
 var uVmatrix = gl.getUniformLocation(mainProgram, "uVmatrix");
 
 var uWorldPos = gl.getUniformLocation(mainProgram, "uWorldPos");
 var aData = gl.getAttribLocation(mainProgram, "aData");
 
-var aTextCoord = gl.getAttribLocation(mainProgram, "aTextCoord");
-var uTextureSize = gl.getUniformLocation(mainProgram, "uTextureSize");
-var uAtlasSize = gl.getUniformLocation(mainProgram, "uAtlasSize");
-var uTexture = gl.getUniformLocation(mainProgram, "uTexture");
-
-var uAmbientLight = gl.getUniformLocation(mainProgram, "uAmbientLight");
 var uLightColor = gl.getUniformLocation(mainProgram, "uLightColor");
 var uLightPosition = gl.getUniformLocation(mainProgram, "uLightPosition");
 var uViewPosition = gl.getUniformLocation(mainProgram, 'uViewPosition');
@@ -254,14 +262,6 @@ cloudsImage.addEventListener('load', function() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 });
 
-/*================= Mouse and Player ======================*/
-
-const mousePos = {x: 0, y: 0}
-
-const player = {pos: {x: chunkWidth/2, y:chunkHeight+2, z: chunkWidth/2}, yaw: 0, pitch: 0,
-                blockType: 3, blockSelected: false, breakBlock: false, placeBlock: false,
-                hitbox: {width: 0.3, height: 1.65}}
-
 /*=================== Drawing =================== */
 
 let frameCount = 0;
@@ -272,7 +272,7 @@ var obj = {
     FPS: 0,
     cameraPosition: player.pos,
     cameraDirection: {x: 0, y: 0, z: 0},
-    lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), ambient: 0.3, gamma: 1.22},
+    lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), gamma: 1.45},
     FOV: 60,
     speed: 0.1,
     // rotationSpeed: 0.02, // Speed of rotation
@@ -305,8 +305,7 @@ var lightPositionFolder = gui.addFolder('Light Position')
 lightPositionFolder.add(obj.lightPosition, 'x').min(-chunkWidth*chunksNum*2).max(chunkWidth*chunksNum*2).step(1);
 lightPositionFolder.add(obj.lightPosition, 'y').min(-chunkHeight*2).max(chunkHeight*2).step(1);
 lightPositionFolder.add(obj.lightPosition, 'z').min(-chunkWidth*chunksNum*2).max(chunkWidth*chunksNum*2).step(1);
-lightPositionFolder.add(obj.lightPosition, 'ambient').min(0).max(2).step(0.01);
-lightPositionFolder.add(obj.lightPosition, 'gamma').min(0).max(2).step(0.01);
+lightPositionFolder.add(obj.lightPosition, 'gamma').min(0).max(2.5).step(0.01);
 lightPositionFolder.open()
 var FOV = gui.add(obj, 'FOV').min(10).max(120).step(5);
 gui.add(obj, 'speed').min(0.01).max(1).step(0.01);
@@ -417,7 +416,6 @@ var animate = function() {
     gl.uniform3fv(uViewPosition, [cameraPositionArray[0], cameraPositionArray[1], cameraPositionArray[2]]);  // Your camera position
 
     gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
-    gl.uniform3f(uAmbientLight, obj.lightPosition.ambient, obj.lightPosition.ambient, obj.lightPosition.ambient);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
     if (obj.dayLightCycle){
         gl.uniform3fv(uLightPosition, [ player.pos.x - chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2)),
@@ -443,15 +441,21 @@ var animate = function() {
         gl.vertexAttribPointer(aData, 1, gl.FLOAT, false, 0,0);
         gl.vertexAttribDivisor(aData, 1);
 
+        var aoBuffer = createBufferFromArray(new Float32Array(chunk.ao), gl.ARRAY_BUFFER);
+        gl.bindBuffer(gl.ARRAY_BUFFER, aoBuffer);
+        gl.enableVertexAttribArray(aAmbientOcclusion);
+        gl.vertexAttribPointer(aAmbientOcclusion, 4, gl.FLOAT, false, 0,0);
+        gl.vertexAttribDivisor(aAmbientOcclusion, 1);
+
         gl.drawElementsInstanced(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, chunk.instanceCount);
     });
     
-    renderSum += performance.now() - renderTime
+    renderSum += performance.now() - renderTime;
     frameCount++;
 
     // Update FPS every second
     if (frameCount >= 100) {
-        FPS.setValue(Math.round((frameCount * 600) / (renderSum)));
+        FPS.setValue(Math.round(frameCount / (renderSum / 1000)));
         frameCount = 0;
         renderSum = 0;
     }
