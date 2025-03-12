@@ -8,12 +8,12 @@ class Chunk {
         this.perlinNoise = new PerlinNoise(this.rng);
 
         this.chunkGrid = new OctreeNode({ x: chunkSize.width/2, y: chunkSize.width/2, z: chunkSize.width/2 }, chunkSize.width);
+        this.neighborChunks = [];
 
         this.mesh = [];
+        this.water = [];
 
         this.ao = [];
-
-        this.instanceCount = 0;
 
         this.toGenerate = true;
     }
@@ -64,61 +64,32 @@ class Chunk {
             return visibleFaces;
         }
 
+        let neighbors = [
+            world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
+            world.getBlock(this.position.x + x, y, this.position.z + z + 1), // Front
+            world.getBlock(this.position.x + x - 1, y, this.position.z + z), // Left
+            world.getBlock(this.position.x + x + 1, y, this.position.z + z), // Right
+            world.getBlock(this.position.x + x, y, this.position.z + z - 1), // Back
+            world.getBlock(this.position.x + x, y - 1, this.position.z + z), // Bottom
+        ];
+         
+         
+        if (y == 0) {
+            neighbors.pop();
+        }
+        if (!this.neighborChunks[0] && z == 0){
+            neighbors.splice(4, 1);
+        }
+        if (!this.neighborChunks[1]  && x == 31){
+            neighbors.splice(3, 1);
+        }
+        if (!this.neighborChunks[2]  && x == 0){
+            neighbors.splice(2, 1);
+        }
+        if (!this.neighborChunks[3]  && z == 31){
+            neighbors.splice(1, 1);
+        }
         
-        // const playerX = Math.floor(player.pos.x / this.size.width);
-        // const playerZ = Math.floor(player.pos.z / this.size.width);
-        let neighbors = []
-        // if (this.position.x == playerX && this.position.z == playerZ){
-            neighbors = [
-                world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
-                world.getBlock(this.position.x + x, y, this.position.z + z + 1), // Front
-                world.getBlock(this.position.x + x - 1, y, this.position.z + z), // Left
-                world.getBlock(this.position.x + x + 1, y, this.position.z + z), // Right
-                world.getBlock(this.position.x + x, y, this.position.z + z - 1), // Back
-                world.getBlock(this.position.x + x, y - 1, this.position.z + z), // Bottom
-            ];
-        // }
-        // else{
-        //     neighbors = [
-        //         world.getBlock(this.position.x + x, y + 1, this.position.z + z), // Top
-        //     ];
-
-        //     if (playerZ == this.position.z){
-        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z + 1));
-        //         if (this.position.x < playerX) { 
-        //             neighbors.push(1, world.getBlock(this.position.x + x + 1, y, this.position.z + z));
-        //         } else if (this.position.x > playerX) {
-        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z), 1);
-        //         }
-        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z - 1));
-        //     }
-        //     else if ( this.position.z > playerZ) {
-        //         neighbors.push(1);
-        //         if (playerX == this.position.x){
-        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z));
-        //             neighbors.push(world.getBlock(this.position.x + x + 1, y, this.position.z + z));
-        //         }
-        //         else if (this.position.x < playerX) { 
-        //             neighbors.push(1, world.getBlock(this.position.x + x + 1, y, this.position.z + z));
-        //         } else if (this.position.x > playerX) {
-        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z), 1);
-        //         }
-        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z - 1));
-        //     } else if (this.position.z < playerZ) {
-        //         neighbors.push(world.getBlock(this.position.x + x, y, this.position.z + z + 1));
-        //         if (playerX == this.position.x){
-        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z));
-        //             neighbors.push(world.getBlock(this.position.x + x + 1, y, this.position.z + z));
-        //         }
-        //         else if (this.position.x < playerX) { 
-        //             neighbors.push(1, world.getBlock(this.position.x + x + 1, y, this.position.z + z));
-        //         } else if (this.position.x > playerX) {
-        //             neighbors.push(world.getBlock(this.position.x + x - 1, y, this.position.z + z), 1);
-        //         }
-        //         neighbors.push(1);
-        //     }
-        //     neighbors.push(world.getBlock(this.position.x + x, y - 1, this.position.z + z));
-        // } 
 
         for(let i = 0; i < neighbors.length; i++){
             if (!neighbors[i]) {
@@ -129,6 +100,8 @@ class Chunk {
     }
 
     generateTerrain() {
+        this.water = [];
+        let waterLevel = Math.floor(this.params.terrain.magnitude / 3) + 1;
         for (let x = 0; x < this.size.width; x++) {
             for (let z = 0; z < this.size.width; z++) {
                 const value = this.perlinNoise.noise(
@@ -137,24 +110,29 @@ class Chunk {
                     1
                 );
                 const scaledNoise = value * this.params.terrain.magnitude + this.params.terrain.offset;
-                const h = Math.max(0, Math.min(this.size.height - 1, Math.floor(scaledNoise * this.size.height)));
+                const h = Math.max(0, Math.min(this.size.height - 1, Math.floor(scaledNoise)));
 
                 for (let y = 0; y <= this.size.height; y++) {
+
+                    if (y === waterLevel && y > h) {
+                        this.water.push([(z << 12) | (y << 6) | x]); // water block
+                    }
+
                     if (y < h) {
-                        if(y < 4){
-                            this.addBlock(x, y, z, 3); 
+                        if(y < waterLevel){
+                            this.addBlock(x, y, z, 3); // under water level there is stone
                         }
                         else{
-                            this.addBlock(x, y, z, 2); // Surface block
+                            this.addBlock(x, y, z, 2); // dirt block
                         }
                     } else if (y === h) {
-                        if (y == 4) {
-                            this.addBlock(x, y, z, 4); // Interior block
-                        }else if(y < 4){
-                            this.addBlock(x, y, z, 3); 
+                        if (y === waterLevel) {
+                            this.addBlock(x, y, z, 4); // on the water level there is sand
+                        }else if(y < waterLevel){
+                            this.addBlock(x, y, z, 3); // under water level there is stone
                         }
                         else{
-                            this.addBlock(x, y, z, 1); // Surface block
+                            this.addBlock(x, y, z, 1); // Surface block is grass
                         }
                     }
                     
@@ -164,9 +142,19 @@ class Chunk {
     }
 
     generateMesh(){
-        this.instanceCount = 0;
+
         this.mesh = [];
         this.ao = [];
+
+        const chunkX = (this.position.x / this.size.width);
+        const chunkZ = (this.position.z / this.size.width);
+
+        this.neighborChunks = [
+            world.getChunk({x: chunkX, z: chunkZ - 1}),
+            world.getChunk({x: chunkX + 1, z: chunkZ}),
+            world.getChunk({x: chunkX - 1, z: chunkZ}),
+            world.getChunk({x: chunkX, z: chunkZ + 1})
+        ]
 
         const blocks = this.getAllNodes();
         blocks.forEach(block => {
@@ -179,7 +167,7 @@ class Chunk {
             const faces = this.isFaceVisible(x, y, z);
             // console.log(faces)
             faces.forEach((face) => {
-                this.instanceCount++;
+
                 let value = ((this.getBlock(x, y, z).id - 1) << 21) | (face << 18) | (z << 12) | (y << 6) | x;
                 this.mesh.push(value);
 

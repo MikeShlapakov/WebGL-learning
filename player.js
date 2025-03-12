@@ -197,10 +197,10 @@ function resolveCollision(candidates, player, normal) {
                 onTheGround = true;
             }
             else if (overlapX < overlapZ) {
-                player.pos.x -= Math.sign(normal[0]) * (overlapX*1.1);
+                player.pos.x -= Math.sign(normal[0]) * Math.min((overlapX*1.1), 1);
             }
             else if (overlapX > overlapZ) {
-                player.pos.z -= Math.sign(normal[2]) * (overlapZ*1.1);
+                player.pos.z -= Math.sign(normal[2]) * Math.min((overlapZ*1.1), 1);
             }
         }
     }

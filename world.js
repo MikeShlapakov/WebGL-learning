@@ -1,9 +1,11 @@
 class World {
-    constructor(chunkSize, renderDist, worldParams = {seed: 123, terrain: {scale:20,offset: 0,magnitude: 0.4}}) {
+    constructor(chunkSize, renderDist, worldParams = {seed: 123, terrain: {scale:40, offset: 1,magnitude: 20}}) {
         this.chunkSize = chunkSize;
         this.renderDist = renderDist;
         this.worldParams = worldParams;
         
+        this.countInstances = 0;
+
         this.chunks = [];
     }
 
@@ -38,15 +40,15 @@ class World {
     }
 
     generateAllMeshes(){
-        let countInstances = 0;
+        this.countInstances = 0;
         for (const chunk of this.chunks) {
             if(chunk.toGenerate){
                 chunk.generateMesh();
                 chunk.toGenerate = false;
-                countInstances += chunk.instanceCount;
             }
+            this.countInstances += chunk.mesh.length;
         }
-        return countInstances;
+        return this.countInstances;
     }
 
     removeBlock(x, y, z){
@@ -143,12 +145,11 @@ class World {
 
         for (let chunk = 0; chunk < prevChunks.length; chunk++) {
             if (!this.chunks.includes(prevChunks[chunk])){
-                this.generateAllMeshes();
+                this.countInstances = this.generateAllMeshes();
                 break;
             }
         }
-
-        return;
+        return this.countInstances;
     }
 
     getBlock(x, y, z) {

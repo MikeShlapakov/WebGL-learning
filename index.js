@@ -2,7 +2,7 @@
 var canvas = document.getElementById('canvas');
 gl = canvas.getContext('webgl2');
 if (!gl) {
-    console.log("no webgl for you!")
+    alert("No WebGL for you!\nSorry, something went wrong and this page wasn't able to load WebGL2.\nTry different browser instead.")
 }
 
 
@@ -77,6 +77,9 @@ const handBlockProgram = createProgramFromSource(gl, {vertexShader:"hand-block-v
 
 const cloudsProgram = createProgramFromSource(gl, {vertexShader:"clouds-vertex-shader",
                                                     fragmentShader:"clouds-fragment-shader"})
+
+const waterProgram = createProgramFromSource(gl, {vertexShader:"water-vertex-shader",
+                                                    fragmentShader:"water-fragment-shader"})
 
 /*======== Associating attributes to vertex shader =====*/
 var aPosition = gl.getAttribLocation(mainProgram, "aPosition");
@@ -215,6 +218,37 @@ var cloudsIndexbuffer = createBufferFromArray(new Uint32Array(
     ]
 ), gl.ELEMENT_ARRAY_BUFFER);
 
+/*======== Setting Clouds attributes =====*/
+
+var waterPosition = gl.getAttribLocation(waterProgram, "aWaterPosition");
+var waterPmatrix = gl.getUniformLocation(waterProgram, "uPmatrix");
+var waterVmatrix = gl.getUniformLocation(waterProgram, "uVmatrix");
+var wateruTime = gl.getUniformLocation(waterProgram, "uTime");
+
+var wateruWorldPos = gl.getUniformLocation(waterProgram, "uWorldPos");
+var wateraData = gl.getAttribLocation(waterProgram, "aWaterData");
+
+var wateraTextCoord = gl.getAttribLocation(waterProgram, "aTextCoord");
+var wateruTexture = gl.getUniformLocation(waterProgram, "uTexture");
+
+var wateruLightColor = gl.getUniformLocation(waterProgram, "uLightColor");
+var wateruLightPosition = gl.getUniformLocation(waterProgram, "uLightPosition");
+var wateruViewPosition = gl.getUniformLocation(waterProgram, 'uViewPosition');
+var wateruGammaCorrection = gl.getUniformLocation(waterProgram, 'uGammaCorrection');
+
+var wateruFogColor = gl.getUniformLocation(waterProgram, "uFogColor");
+var wateruFogNear = gl.getUniformLocation(waterProgram, "uFogNear");
+var wateruFogFar = gl.getUniformLocation(waterProgram, "uFogFar");
+
+
+var waterPositionBuffer = createBufferFromArray(new Float32Array([
+    0.5,  0.5,  0.5, -0.5,  0.5,  0.5, 
+   -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
+]), gl.ARRAY_BUFFER);
+
+var waterIndexbuffer = createBufferFromArray(new Uint32Array(
+   [ 0, 2, 1, 0, 3, 2]
+), gl.ELEMENT_ARRAY_BUFFER);
 
 /*========== Defining and storing the geometry ==========*/
 
@@ -270,6 +304,7 @@ let renderSum = 0; // sum of render time for each frame
 var precentage = {precent: 0}
 var obj = {
     FPS: 0,
+    Instances: countInstances,
     cameraPosition: player.pos,
     cameraDirection: {x: 0, y: 0, z: 0},
     lightPosition: {x: Math.floor(chunkWidth/2), y:chunkHeight, z:Math.floor(chunkWidth/2), gamma: 1.45},
@@ -291,6 +326,7 @@ gui.domElement.id = 'gui';
 
 // var perc = gui.add(precentage, 'precent')
 var FPS = gui.add(obj, 'FPS')
+var displayInstances = gui.add(obj, 'Instances')
 var cameraPositionFolder = gui.addFolder('Camera Position')
 cameraPositionFolder.add(obj.cameraPosition, 'x').step(0.1);
 cameraPositionFolder.add(obj.cameraPosition, 'y').step(0.1);
@@ -337,6 +373,11 @@ let y_speed = 0;
 let max_y_velocity = 0.3;
 let onTheGround = true;
 
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+gl.enable(gl.CULL_FACE);
+gl.enable(gl.BLEND);
+gl.enable(gl.DEPTH_TEST);
+
 var animate = function() {
     let renderTime = performance.now();
 
@@ -349,9 +390,6 @@ var animate = function() {
         }
     }
 
-    gl.enable(gl.CULL_FACE);
-    gl.enable(gl.DEPTH_TEST);
-    // gl.depthFunc(gl.LEQUAL);
     
     var color = obj.skyColor;
     // Update sky color based on time
@@ -372,8 +410,8 @@ var animate = function() {
     
     var proj_matrix = get_projection(obj.FOV, canvas.width/canvas.height, obj.zMin, obj.zMax);
     var cameraPositionArray = calculateCameraPos(player.pos, obj.speed, player.yaw, player.pitch);
-    world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
-                        Math.floor(player.pos.z / chunkWidth))
+    displayInstances.setValue(world.renderChunks(Math.floor(player.pos.x / chunkWidth), 
+                                                 Math.floor(player.pos.z / chunkWidth)));
     cameraPositionFolder.updateDisplay()
     var target = [ cameraPositionArray[0] + Math.cos(player.pitch) * Math.cos(player.yaw),
                     cameraPositionArray[1] - Math.sin(player.pitch),
@@ -413,21 +451,20 @@ var animate = function() {
 
     gl.uniformMatrix4fv(uPmatrix, false, proj_matrix);
     gl.uniformMatrix4fv(uVmatrix, false, view_matrix);
-    gl.uniform3fv(uViewPosition, [cameraPositionArray[0], cameraPositionArray[1], cameraPositionArray[2]]);  // Your camera position
+    gl.uniform3fv(uViewPosition, [player.pos.x, player.pos.y, player.pos.x]);  // Your camera position
 
     gl.uniform3f(uLightColor, color[0]/255, color[1]/255, color[2]/255);
     gl.uniform3f(uGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
     if (obj.dayLightCycle){
-        gl.uniform3fv(uLightPosition, [ player.pos.x - chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2)),
+        gl.uniform3fv(uLightPosition, [ player.pos.x + chunkWidth * chunksNum * Math.cos((time)),
                                         2 * chunkHeight * Math.sin(time),
-                                        player.pos.z - chunkWidth * chunksNum * Math.sin((time/2))*Math.sin((time/2))]);
+                                        player.pos.z + chunkWidth * chunksNum * Math.cos((time))]);
     }
     else{
         gl.uniform3fv(uLightPosition, [ obj.lightPosition.x,
                                     obj.lightPosition.y,
                                     obj.lightPosition.z]);
     }
-
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
     
@@ -447,18 +484,10 @@ var animate = function() {
         gl.vertexAttribPointer(aAmbientOcclusion, 4, gl.FLOAT, false, 0,0);
         gl.vertexAttribDivisor(aAmbientOcclusion, 1);
 
-        gl.drawElementsInstanced(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, chunk.instanceCount);
+        gl.drawElementsInstanced(showLines() ? gl.TRIANGLES : gl.LINES, indices.length, gl.UNSIGNED_INT, 0, chunk.mesh.length);
     });
     
-    renderSum += performance.now() - renderTime;
-    frameCount++;
-
-    // Update FPS every second
-    if (frameCount >= 100) {
-        FPS.setValue(Math.round(frameCount / (renderSum / 1000)));
-        frameCount = 0;
-        renderSum = 0;
-    }
+    drawWater(time, proj_matrix, view_matrix, color);
 
     let ray = castARay(world, 
         {
@@ -502,14 +531,21 @@ var animate = function() {
 
     drawHandBlock(time, player.blockType);
 
+    renderSum += performance.now() - renderTime;
+    frameCount++;
+
+    // Update FPS every second
+    if (frameCount >= 100) {
+        FPS.setValue(Math.round(frameCount / (renderSum / 1000)));
+        frameCount = 0;
+        renderSum = 0;
+    }
+
     window.requestAnimationFrame(animate);
 }
 animate(0);
 
 function drawPicker(time, pos, normal, Pmatrix, Vmatrix){
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
     gl.useProgram(pickerProgram);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, pickerPositionBuffer);
@@ -558,7 +594,6 @@ function drawPicker(time, pos, normal, Pmatrix, Vmatrix){
 }
 
 function drawCrosshair(){
-    gl.disable(gl.DEPTH_TEST);
     gl.useProgram(crosshairProgram);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, crosshairPositionBuffer);
@@ -580,9 +615,6 @@ function drawCrosshair(){
 }
 
 function drawHandBlock(time, blockType){
-    // gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.BLEND);
-
     gl.useProgram(handBlockProgram);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, handBlockPositionBuffer);
@@ -623,9 +655,6 @@ function drawHandBlock(time, blockType){
 }
 
 function drawClouds(time, Pmatrix, Vmatrix){
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.BLEND);
-
     gl.useProgram(cloudsProgram);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, cloudsPositionBuffer);
@@ -669,4 +698,60 @@ function drawClouds(time, Pmatrix, Vmatrix){
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cloudsIndexbuffer);
 
     gl.drawElements(gl.TRIANGLES, 12, gl.UNSIGNED_INT, 0);
+}
+
+function drawWater(time, Pmatrix, Vmatrix, color){
+    gl.useProgram(waterProgram);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, waterPositionBuffer);
+    gl.enableVertexAttribArray(waterPosition);
+    gl.vertexAttribPointer(waterPosition, 3, gl.FLOAT, false, 0, 0);
+
+    gl.uniformMatrix4fv(waterPmatrix, false, Pmatrix);
+    gl.uniformMatrix4fv(waterVmatrix, false, Vmatrix);
+
+    const w = textureSize/atlasWidth;
+    const h = textureSize/atlasHeight;
+    const textureCoords = [ w, 6 * h, 0, 6 * h, 0, (6 - 1) * h, w, (6 - 1) * h];
+
+    var textureBuffer = createBufferFromArray(new Float32Array(textureCoords), gl.ARRAY_BUFFER);
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+    gl.enableVertexAttribArray(wateraTextCoord);
+    gl.vertexAttribPointer(wateraTextCoord, 2, gl.FLOAT, false, 0, 0);
+   
+    gl.uniform4fv(wateruFogColor, [color[0]/255, color[1]/255, color[2]/255, 1]);
+    gl.uniform1f(wateruFogNear, obj.fogNear * obj.zMax);
+    gl.uniform1f(wateruFogFar, obj.fogFar * obj.zMax);
+
+    gl.uniform3fv(wateruViewPosition, [player.pos.x, player.pos.y, player.pos.z]);  // Your camera position
+
+    gl.uniform3f(wateruLightColor, color[0]/255, color[1]/255, color[2]/255);
+    gl.uniform3f(wateruGammaCorrection, obj.lightPosition.gamma, obj.lightPosition.gamma, obj.lightPosition.gamma);
+    if (obj.dayLightCycle){
+        gl.uniform3fv(wateruLightPosition, [ player.pos.x + chunkWidth * chunksNum * Math.cos((time)),
+                                            2 * chunkHeight * Math.sin(time),
+                                            player.pos.z + chunkWidth * chunksNum * Math.cos((time))]);
+    }
+    else{
+        gl.uniform3fv(wateruLightPosition, [ obj.lightPosition.x,
+                                    obj.lightPosition.y,
+                                    obj.lightPosition.z]);
+    }
+    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+    gl.uniform1f(wateruTime, time);
+
+    world.chunks.forEach(chunk => {
+        if (chunk.water.length > 0){
+            gl.uniform2f(wateruWorldPos, chunk.position.x, chunk.position.z);
+
+            var wateraDataBuffer = createBufferFromArray(new Float32Array(chunk.water), gl.ARRAY_BUFFER);
+            gl.bindBuffer(gl.ARRAY_BUFFER, wateraDataBuffer);
+            gl.enableVertexAttribArray(wateraData);
+            gl.vertexAttribPointer(wateraData, 1, gl.FLOAT, false, 0,0);
+            gl.vertexAttribDivisor(wateraData, 1);
+
+            gl.drawElementsInstanced(showLines() ? gl.TRIANGLES : gl.LINES, 6, gl.UNSIGNED_INT, 0, chunk.water.length);
+        }
+    });
 }

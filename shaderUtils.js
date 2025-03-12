@@ -17,7 +17,7 @@ function createProgramFromSource(gl, {vertexShader, fragmentShader}){
     if (!linked) {
         // something went wrong with the link
         const lastError = gl.getProgramInfoLog(program);
-        console.log('Error in program linking:' + lastError);
+        alert('Error in program linking: ' + lastError);
 
         gl.deleteProgram(program);
         return null;
